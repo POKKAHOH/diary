@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Geniigg - Расписание</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #0f0f0f;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .week-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 400px;
+            margin: 20px auto;
+            background: #1e1e1e;
+            padding: 10px 20px;
+            border-radius: 30px;
+            position: relative;
+        }
+        .nav-arrow {
+            font-size: 24px;
+            color: #ffcc00;
+            text-decoration: none;
+            padding: 5px 15px;
+            border-radius: 50%;
+            background: #333;
+        }
+        .nav-arrow:hover {
+            background: #444;
+        }
+        .month-year {
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+        }
+        .date-picker-popup {
+            position: absolute;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2d2d2d;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            width: 250px;
+        }
+        .dark-date-picker {
+            background: #3d3d3d;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 8px;
+            width: 100%;
+            margin-bottom: 10px;
+            color-scheme: dark;
+        }
+        .date-picker-popup button {
+            padding: 8px 15px;
+            background: #ffcc00;
+            color: black;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        .date-picker-popup button:hover {
+            background: #e6b800;
+        }
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .day-card {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .day-card h3 {
+            margin-top: 0;
+            color: #ffcc00;
+            text-align: center;
+        }
+        .lesson {
+            background: #2d2d2d;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            position: relative;
+        }
+        .lesson-num {
+            font-weight: bold;
+            color: #ffcc00;
+            margin-right: 5px;
+        }
+        .lesson-subject {
+            color: #fff;
+        }
+        .lesson-topic {
+            display: block;
+            color: #4da6ff;
+            text-decoration: none;
+            margin-top: 5px;
+        }
+        .lesson-topic:hover {
+            text-decoration: underline;
+        }
+        .no-lesson {
+            color: #888;
+            text-align: center;
+            font-style: italic;
+        }
+        .admin-link {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+        .admin-link a {
+            color: #ffcc00;
+            text-decoration: none;
+        }
+        .admin-icons {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+        }
+        .admin-icons a {
+            color: #ffcc00;
+            text-decoration: none;
+            margin-left: 5px;
+            font-size: 16px;
+        }
+        .admin-icons a:hover {
+            color: #ffaa00;
+        }
+        .add-lesson-btn {
+            background: #333;
+            color: #ffcc00;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .add-lesson-btn:hover {
+            background: #444;
+        }
+        /* Модальные окна */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 8px;
+            width: 400px;
+            color: white;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+        }
+        .modal-content .form-group {
+            margin-bottom: 15px;
+        }
+        .modal-content label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+        .modal-content input,
+        .modal-content select,
+        .modal-content textarea {
+            width: 100%;
+            padding: 5px;
+            background: #3d3d3d;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+        }
+        .modal-buttons {
+            text-align: right;
+            margin-top: 15px;
+        }
+        .modal-buttons button {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .modal-buttons .cancel {
+            background: #666;
+            color: white;
+        }
+        .modal-buttons .submit {
+            background: #ffcc00;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-link">
+        {% if is_admin %}
+            <a href="{{ url_for('logout') }}">Выйти (админ)</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Вход для админа</a>
+        {% endif %}
+    </div>
+
+    <h1>📚 Расписание уроков</h1>
+    <!-- БЛОК НАВИГАЦИИ -->
+    <div class="week-navigation">
+        <a href="?week={{ current_week-1 if current_week > 1 else 1 }}" class="nav-arrow">←</a>
+        <span class="month-year" id="month-year-trigger">
+            Неделя {{ current_week }}: {{ month_year }}
+            <div id="date-picker-popup" class="date-picker-popup">
+                <input type="date" id="date-picker" class="dark-date-picker" value="{{ today_str }}">
+                <button id="go-to-date">Перейти</button>
+            </div>
+        </span>
+        <a href="?week={{ current_week+1 }}" class="nav-arrow">→</a>
+    </div>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <div style="max-width: 800px; margin: 10px auto; background: #333; border-left: 4px solid #ffcc00; padding: 10px; border-radius: 4px;">
+            {% for msg in messages %}
+                <p style="margin: 5px 0; color: white;">{{ msg }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+
+    <div class="schedule-grid">
+        {% for day in schedule %}
+        <div class="day-card" data-day-id="{{ day.id }}">
+            <h3>{{ day.name }}<br><small>{{ day.date.strftime('%d.%m.%Y') }}</small></h3>
+            {% if day.lessons %}
+                {% for lesson in day.lessons %}
+                <div class="lesson" data-lesson-id="{{ lesson.id }}">
+                    <span class="lesson-num">{{ lesson.lesson_number }}.</span>
+                    <span class="lesson-subject">{{ lesson.subject }}</span>
+                    <a href="{{ url_for('lesson_detail', id=lesson.id) }}" class="lesson-topic">{{ lesson.topic }}</a>
+                    {% if is_admin %}
+                    <div class="admin-icons">
+                        <a href="#" class="edit-lesson" data-lesson-id="{{ lesson.id }}" title="Редактировать">✏️</a>
+                        <a href="#" class="delete-lesson" data-lesson-id="{{ lesson.id }}" title="Удалить">🗑️</a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="no-lesson">Нет уроков</p>
+            {% endif %}
+            {% if is_admin %}
+                <button class="add-lesson-btn" data-day-id="{{ day.id }}" data-week="{{ current_week }}">➕ Добавить урок</button>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Модальное окно для добавления урока -->
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <h3>Добавить урок</h3>
+            <form id="add-form" method="POST" action="{{ url_for('quick_add') }}">
+                <input type="hidden" name="day_id" id="add-day-id">
+                <input type="hidden" name="week" id="add-week">
+                <div class="form-group">
+                    <label>Номер урока:</label>
+                    <input type="number" name="lesson_number" min="1" max="8" required>
+                </div>
+                <div class="form-group">
+                    <label>Предмет:</label>
+                    <select name="subject" required>
+                        <option value="Алгебра">Алгебра</option>
+                        <option value="Физика">Физика</option>
+                        <option value="Химия">Химия</option>
+                        <option value="Информатика">Информатика</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Тема урока:</label>
+                    <input type="text" name="topic" required>
+                </div>
+                <div class="form-group">
+                    <label>Домашнее задание:</label>
+                    <textarea name="homework" rows="3"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="cancel" id="add-cancel">Отмена</button>
+                    <button type="submit" class="submit">Добавить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно для редактирования урока -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h3>Редактировать урок</h3>
+            <form id="edit-form" method="POST" action="">
+                <input type="hidden" name="day_id" id="edit-day-id">
+                <input type="hidden" name="week" id="edit-week">
+                <input type="hidden" name="lesson_id" id="edit-lesson-id">
+                <div class="form-group">
+                    <label>Номер урока:</label>
+                    <input type="number" name="lesson_number" id="edit-lesson-number" min="1" max="8" required>
+                </div>
+                <div class="form-group">
+                    <label>Предмет:</label>
+                    <select name="subject" id="edit-subject" required>
+                        <option value="Алгебра">Алгебра</option>
+                        <option value="Физика">Физика</option>
+                        <option value="Химия">Химия</option>
+                        <option value="Информатика">Информатика</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Тема урока:</label>
+                    <input type="text" name="topic" id="edit-topic" required>
+                </div>
+                <div class="form-group">
+                    <label>Домашнее задание:</label>
+                    <textarea name="homework" id="edit-homework" rows="3"></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button type="button" class="cancel" id="edit-cancel">Отмена</button>
+                    <button type="submit" class="submit">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Календарь
+            const trigger = document.getElementById('month-year-trigger');
+            const popup = document.getElementById('date-picker-popup');
+            const datePicker = document.getElementById('date-picker');
+            const goBtn = document.getElementById('go-to-date');
+
+            trigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                popup.style.display = popup.style.display === 'none' ? 'flex' : 'none';
+                if (popup.style.display === 'flex') {
+                    datePicker.focus();
+                }
+            });
+
+            goBtn.addEventListener('click', function() {
+                const selectedDate = datePicker.value;
+                if (selectedDate) {
+                    window.location.href = `?date=${selectedDate}`;
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!trigger.contains(e.target) && !popup.contains(e.target)) {
+                    popup.style.display = 'none';
+                }
+            });
+
+            popup.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+
+            // Модальное окно добавления
+            const addModal = document.getElementById('add-modal');
+            const addDayId = document.getElementById('add-day-id');
+            const addWeek = document.getElementById('add-week');
+            const addCancel = document.getElementById('add-cancel');
+
+            document.querySelectorAll('.add-lesson-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    addDayId.value = this.dataset.dayId;
+                    addWeek.value = this.dataset.week;
+                    addModal.style.display = 'flex';
+                });
+            });
+
+            addCancel.addEventListener('click', function() {
+                addModal.style.display = 'none';
+            });
+
+            window.addEventListener('click', function(e) {
+                if (e.target === addModal) {
+                    addModal.style.display = 'none';
+                }
+                if (e.target === editModal) {
+                    editModal.style.display = 'none';
+                }
+            });
+
+            // Модальное окно редактирования
+            const editModal = document.getElementById('edit-modal');
+            const editForm = document.getElementById('edit-form');
+            const editDayId = document.getElementById('edit-day-id');
+            const editWeek = document.getElementById('edit-week');
+            const editLessonId = document.getElementById('edit-lesson-id');
+            const editLessonNumber = document.getElementById('edit-lesson-number');
+            const editSubject = document.getElementById('edit-subject');
+            const editTopic = document.getElementById('edit-topic');
+            const editHomework = document.getElementById('edit-homework');
+            const editCancel = document.getElementById('edit-cancel');
+
+            // Функция для загрузки данных урока
+            async function loadLessonData(lessonId) {
+                try {
+                    const response = await fetch(`/api/lesson/${lessonId}`);
+                    if (!response.ok) throw new Error('Ошибка загрузки');
+                    const data = await response.json();
+                    editDayId.value = data.day_id;
+                    editWeek.value = data.week;
+                    editLessonNumber.value = data.lesson_number;
+                    editSubject.value = data.subject;
+                    editTopic.value = data.topic;
+                    editHomework.value = data.homework;
+                    editLessonId.value = lessonId;
+                    editForm.action = `/edit/${lessonId}`;
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    alert('Не удалось загрузить данные урока');
+                }
+            }
+
+            document.querySelectorAll('.edit-lesson').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const lessonId = this.dataset.lessonId;
+                    loadLessonData(lessonId).then(() => {
+                        editModal.style.display = 'flex';
+                    });
+                });
+            });
+
+            editCancel.addEventListener('click', function() {
+                editModal.style.display = 'none';
+            });
+
+            // Удаление с подтверждением
+            document.querySelectorAll('.delete-lesson').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (confirm('Вы уверены, что хотите удалить этот урок?')) {
+                        const lessonId = this.dataset.lessonId;
+                        window.location.href = `/delete/${lessonId}`;
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

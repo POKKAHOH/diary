@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Редактировать урок</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: inline-block; width: 120px; }
+        input, select, textarea { width: 300px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Редактировать урок</h1>
+    <p><a href="{{ url_for('admin') }}">Назад к админке</a></p>
+
+    <form method="post">
+        <div class="form-group">
+            <label>День:</label>
+            <select name="day_id" required>
+                {% for day in days %}
+                <option value="{{ day.id }}" {% if day.id == lesson.day_id %}selected{% endif %}>{{ day.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Номер урока:</label>
+            <input type="number" name="lesson_number" value="{{ lesson.lesson_number }}" min="1" max="8" required>
+        </div>
+        <div class="form-group">
+            <label>Предмет:</label>
+            <select name="subject" required>
+                <option value="Химия" {% if lesson.subject == 'Химия' %}selected{% endif %}>Химия</option>
+                <option value="Физика" {% if lesson.subject == 'Физика' %}selected{% endif %}>Физика</option>
+                <option value="Информатика" {% if lesson.subject == 'Информатика' %}selected{% endif %}>Информатика</option>
+                <option value="Алгебра" {% if lesson.subject == 'Алгебра' %}selected{% endif %}>Алгебра</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Тема урока:</label>
+            <input type="text" name="topic" value="{{ lesson.topic }}" required>
+        </div>
+        <div class="form-group">
+            <label>Домашнее задание:</label>
+            <textarea name="homework" rows="3">{{ lesson.homework }}</textarea>
+        </div>
+        <button type="submit">Сохранить</button>
+    </form>
+</body>
+</html>
