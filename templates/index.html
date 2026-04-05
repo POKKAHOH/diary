@@ -80,12 +80,24 @@
             background: #e6b800;
         }
         .schedule-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            max-width: 800px;
-            margin: 0 auto;
+   	    display: grid;
+	    grid-template-columns: repeat(3, 1fr);
+	    gap: 20px;
+	    width: 100%;
+	    padding: 0 20px;
+  	    box-sizing: border-box;
         }
+	@media (max-width: 768px) {
+	    .schedule-grid {
+	        grid-template-columns: repeat(2, 1fr);
+	        padding: 0 10px;
+	    }
+	}
+	@media (max-width: 480px) {
+	    .schedule-grid {
+	        grid-template-columns: 1fr;
+	    }
+	}
         .day-card {
             background: #1e1e1e;
             border-radius: 8px;
@@ -266,97 +278,14 @@
                     <span class="lesson-num">{{ lesson.lesson_number }}.</span>
                     <span class="lesson-subject">{{ lesson.subject }}</span>
                     <a href="{{ url_for('lesson_detail', id=lesson.id) }}" class="lesson-topic">{{ lesson.topic }}</a>
-                    {% if is_admin %}
-                    <div class="admin-icons">
-                        <a href="#" class="edit-lesson" data-lesson-id="{{ lesson.id }}" title="Редактировать">✏️</a>
-                        <a href="#" class="delete-lesson" data-lesson-id="{{ lesson.id }}" title="Удалить">🗑️</a>
-                    </div>
-                    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
                 <p class="no-lesson">Нет уроков</p>
             {% endif %}
-            {% if is_admin %}
-                <button class="add-lesson-btn" data-day-id="{{ day.id }}" data-week="{{ current_week }}">➕ Добавить урок</button>
-            {% endif %}
         </div>
         {% endfor %}
     </div>
-
-    <!-- Модальное окно для добавления урока -->
-    <div id="add-modal" class="modal">
-        <div class="modal-content">
-            <h3>Добавить урок</h3>
-            <form id="add-form" method="POST" action="{{ url_for('quick_add') }}">
-                <input type="hidden" name="day_id" id="add-day-id">
-                <input type="hidden" name="week" id="add-week">
-                <div class="form-group">
-                    <label>Номер урока:</label>
-                    <input type="number" name="lesson_number" min="1" max="8" required>
-                </div>
-                <div class="form-group">
-                    <label>Предмет:</label>
-                    <select name="subject" required>
-                        <option value="Алгебра">Алгебра</option>
-                        <option value="Физика">Физика</option>
-                        <option value="Химия">Химия</option>
-                        <option value="Информатика">Информатика</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Тема урока:</label>
-                    <input type="text" name="topic" required>
-                </div>
-                <div class="form-group">
-                    <label>Домашнее задание:</label>
-                    <textarea name="homework" rows="3"></textarea>
-                </div>
-                <div class="modal-buttons">
-                    <button type="button" class="cancel" id="add-cancel">Отмена</button>
-                    <button type="submit" class="submit">Добавить</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Модальное окно для редактирования урока -->
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <h3>Редактировать урок</h3>
-            <form id="edit-form" method="POST" action="">
-                <input type="hidden" name="day_id" id="edit-day-id">
-                <input type="hidden" name="week" id="edit-week">
-                <input type="hidden" name="lesson_id" id="edit-lesson-id">
-                <div class="form-group">
-                    <label>Номер урока:</label>
-                    <input type="number" name="lesson_number" id="edit-lesson-number" min="1" max="8" required>
-                </div>
-                <div class="form-group">
-                    <label>Предмет:</label>
-                    <select name="subject" id="edit-subject" required>
-                        <option value="Алгебра">Алгебра</option>
-                        <option value="Физика">Физика</option>
-                        <option value="Химия">Химия</option>
-                        <option value="Информатика">Информатика</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Тема урока:</label>
-                    <input type="text" name="topic" id="edit-topic" required>
-                </div>
-                <div class="form-group">
-                    <label>Домашнее задание:</label>
-                    <textarea name="homework" id="edit-homework" rows="3"></textarea>
-                </div>
-                <div class="modal-buttons">
-                    <button type="button" class="cancel" id="edit-cancel">Отмена</button>
-                    <button type="submit" class="submit">Сохранить</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Календарь
@@ -390,90 +319,6 @@
                 e.stopPropagation();
             });
 
-            // Модальное окно добавления
-            const addModal = document.getElementById('add-modal');
-            const addDayId = document.getElementById('add-day-id');
-            const addWeek = document.getElementById('add-week');
-            const addCancel = document.getElementById('add-cancel');
-
-            document.querySelectorAll('.add-lesson-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    addDayId.value = this.dataset.dayId;
-                    addWeek.value = this.dataset.week;
-                    addModal.style.display = 'flex';
-                });
-            });
-
-            addCancel.addEventListener('click', function() {
-                addModal.style.display = 'none';
-            });
-
-            window.addEventListener('click', function(e) {
-                if (e.target === addModal) {
-                    addModal.style.display = 'none';
-                }
-                if (e.target === editModal) {
-                    editModal.style.display = 'none';
-                }
-            });
-
-            // Модальное окно редактирования
-            const editModal = document.getElementById('edit-modal');
-            const editForm = document.getElementById('edit-form');
-            const editDayId = document.getElementById('edit-day-id');
-            const editWeek = document.getElementById('edit-week');
-            const editLessonId = document.getElementById('edit-lesson-id');
-            const editLessonNumber = document.getElementById('edit-lesson-number');
-            const editSubject = document.getElementById('edit-subject');
-            const editTopic = document.getElementById('edit-topic');
-            const editHomework = document.getElementById('edit-homework');
-            const editCancel = document.getElementById('edit-cancel');
-
-            // Функция для загрузки данных урока
-            async function loadLessonData(lessonId) {
-                try {
-                    const response = await fetch(`/api/lesson/${lessonId}`);
-                    if (!response.ok) throw new Error('Ошибка загрузки');
-                    const data = await response.json();
-                    editDayId.value = data.day_id;
-                    editWeek.value = data.week;
-                    editLessonNumber.value = data.lesson_number;
-                    editSubject.value = data.subject;
-                    editTopic.value = data.topic;
-                    editHomework.value = data.homework;
-                    editLessonId.value = lessonId;
-                    editForm.action = `/edit/${lessonId}`;
-                } catch (error) {
-                    console.error('Ошибка:', error);
-                    alert('Не удалось загрузить данные урока');
-                }
-            }
-
-            document.querySelectorAll('.edit-lesson').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const lessonId = this.dataset.lessonId;
-                    loadLessonData(lessonId).then(() => {
-                        editModal.style.display = 'flex';
-                    });
-                });
-            });
-
-            editCancel.addEventListener('click', function() {
-                editModal.style.display = 'none';
-            });
-
-            // Удаление с подтверждением
-            document.querySelectorAll('.delete-lesson').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (confirm('Вы уверены, что хотите удалить этот урок?')) {
-                        const lessonId = this.dataset.lessonId;
-                        window.location.href = `/delete/${lessonId}`;
-                    }
-                });
-            });
-        });
     </script>
 </body>
 </html>

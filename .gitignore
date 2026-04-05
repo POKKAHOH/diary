@@ -3,4 +3,6 @@ venv/
 __pycache__/
 .env
 instance/
+templates/lesson.html.orig
+school.db
 

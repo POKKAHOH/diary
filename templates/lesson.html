@@ -1,127 +1,243 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
     <title>{{ lesson.subject }} - {{ lesson.topic }}</title>
     <style>
-        body { font-family: Arial; background: #0f0f0f; color: white; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; }
-        h1 { color: #ffcc00; }
-        .video-list { margin-top: 20px; }
-        .video-list a { color: #4da6ff; text-decoration: none; display: block; margin: 5px 0; cursor: pointer; }
-        .video-list a:hover { text-decoration: underline; }
-        #video-player-container { margin-top: 20px; display: none; }
-        .quality-selector { margin: 10px 0; color: white; display: none; }
-        .quality-selector select { padding: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; }
-        .homework { background: #1e1e1e; padding: 15px; border-radius: 8px; margin-top: 20px; }
-        .back-link { display: block; margin-top: 20px; color: #4da6ff; }
-        /* Стили для Plyr (тёмная тема) */
-        .plyr { --plyr-color-main: #ffcc00; --plyr-video-background: #000; }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        h1 {
+            color: #ffcc00;
+            margin-top: 0;
+        }
+        .meta {
+            color: #aaa;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid #333;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            color: #ccc;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #ffcc00;
+            color: #1a1a1a;
+            font-weight: bold;
+        }
+        .tab-btn:hover:not(.active) {
+            background: #2a2a2a;
+            color: #ffcc00;
+        }
+        .tab-content {
+            display: none;
+            animation: fade 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fade {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .video-list {
+            margin-top: 10px;
+        }
+        .video-item {
+            background: #252525;
+            margin: 12px 0;
+            padding: 12px 15px;
+            border-radius: 12px;
+            transition: background 0.2s;
+        }
+        .video-item:hover {
+            background: #2f2f2f;
+        }
+        .video-link {
+            color: #4da6ff;
+            text-decoration: none;
+            font-weight: 500;
+            display: block;
+            cursor: pointer;
+        }
+        .video-link:hover {
+            text-decoration: underline;
+        }
+        #video-player-container {
+            margin-top: 25px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .generated-text {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        .homework {
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 25px;
+            border-left: 4px solid #ffcc00;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 25px;
+            color: #4da6ff;
+            text-decoration: none;
+            background: #252525;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .back-link:hover {
+            background: #333;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 15px; }
+            .tab-btn { padding: 8px 12px; }
+        }
     </style>
-    <!-- Подключаем Plyr CSS -->
     <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
 </head>
 <body>
-    <div class="container">
-        <h1>{{ lesson.subject }} - {{ lesson.topic }}</h1>
-        <p><strong>День:</strong> {{ lesson.day.name }}, урок №{{ lesson.lesson_number }}</p>
-
-        {% if lesson.videos %}
-        <h2>Видеоуроки по теме</h2>
-        <div class="video-list">
-            {% for video in lesson.videos|sort(attribute='order') %}
-                <a class="video-link" data-video-id="{{ video.video_id }}">{{ video.title }}</a>
-            {% endfor %}
-        </div>
-
-        <div id="video-player-container">
-            <!-- Блок выбора качества (по желанию можно оставить) -->
-            <div class="quality-selector">
-                <label for="quality">Качество:</label>
-                <select id="quality"></select>
-            </div>
-            <!-- Сам плеер -->
-            <video id="video-player" controls>
-                <source src="" type="video/mp4">
-            </video>
-        </div>
-        {% endif %}
-
-        {% if lesson.homework %}
-        <div class="homework">
-            <h2>Домашнее задание</h2>
-            <p>{{ lesson.homework }}</p>
-        </div>
-        {% endif %}
-
-        <a href="{{ url_for('home') }}" class="back-link">← Назад к расписанию</a>
+<div class="container">
+    <h1>{{ lesson.subject }} - {{ lesson.topic }}</h1>
+    <div class="meta">
+        <strong>День:</strong> {{ lesson.day.name }}, урок №{{ lesson.lesson_number }}
     </div>
 
-    <!-- Подключаем Plyr JS -->
-    <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
-    <script>
-        const videoContainer = document.getElementById('video-player-container');
-        const videoElement = document.getElementById('video-player');
-        const qualitySelector = document.querySelector('.quality-selector');
-        const qualitySelect = document.getElementById('quality');
-        let player = null;
-        let currentQualities = {};
-document.querySelectorAll('.video-link').forEach(link => {
-    link.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const videoId = link.dataset.videoId;
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="videos">🎬 Видеоуроки</button>
+        <button class="tab-btn" data-tab="text">📖 Текстовый материал</button>
+    </div>
 
-        // Получаем доступные качества (теперь API возвращает только список)
-        const response = await fetch(`/api/qualities/${videoId}`);
-        const data = await response.json();
-        const qualities = data.qualities || [];
+    <div id="tab-videos" class="tab-content active">
+        {% if lesson.videos %}
+            <div class="video-list">
+                {% for video in lesson.videos|sort(attribute='order') %}
+                <div class="video-item">
+                    <a class="video-link" data-video-id="{{ video.video_id }}">{{ video.title }}</a>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="video-player-container" style="display: none;">
+                <video id="video-player" controls>
+                    <source src="" type="video/mp4">
+                </video>
+            </div>
+        {% else %}
+            <p>К этому уроку пока нет видеоуроков.</p>
+        {% endif %}
+    </div>
 
-        // Выбираем предпочтительное качество (720p или максимальное)
-        let preferredQuality = '720';
-        if (!qualities.includes('720') && qualities.length > 0) {
-            // Если 720 нет, берём максимальное (числовое)
-            const numericQualities = qualities
-                .filter(q => q !== 'best')
-                .map(Number)
-                .sort((a, b) => b - a);
-            preferredQuality = numericQualities.length > 0 ? String(numericQualities[0]) : 'best';
-        }
+    <div id="tab-text" class="tab-content">
+        <div class="generated-text">
+            {% if lesson.generated_text %}
+                {{ lesson.generated_text|safe }}
+            {% else %}
+                <p>Текстовый материал пока не сгенерирован. Попробуйте обновить страницу позже.</p>
+            {% endif %}
+        </div>
+    </div>
 
-        // Формируем URL для плеера через прокси
-        const videoUrl = `/proxy/${videoId}`;  // ID видео, качество будет выбрано на сервере
+    {% if lesson.homework %}
+    <div class="homework">
+        <strong>📝 Домашнее задание:</strong>
+        <p style="margin: 8px 0 0 0;">{{ lesson.homework }}</p>
+    </div>
+    {% endif %}
 
-        // Инициализация плеера (пример для Plyr)
-        if (!player) {
-            player = new Plyr('#video-player', {
-                autoplay: true,
-                controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen']
+    <a href="{{ url_for('home') }}" class="back-link">← Назад к расписанию</a>
+</div>
+
+<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+<script>
+    (function() {
+        // Вкладки
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = {
+            videos: document.getElementById('tab-videos'),
+            text: document.getElementById('tab-text')
+        };
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.getAttribute('data-tab');
+                tabBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                Object.values(tabContents).forEach(c => c.classList.remove('active'));
+                if (tabContents[tabId]) tabContents[tabId].classList.add('active');
             });
-            player.source = {
-                type: 'video',
-                sources: [{ src: videoUrl, type: 'video/mp4' }]
-            };
-        } else {
-            player.source = {
-                type: 'video',
-                sources: [{ src: videoUrl, type: 'video/mp4' }]
-            };
-            player.play();
-        }
-        videoContainer.style.display = 'block';
-    });
-});
-        
-        // Обработка смены качества вручную
-        qualitySelect.addEventListener('change', function() {
-            const height = this.value;
-            const url = currentQualities[height];
-            if (player) {
-                player.source = {
-                    type: 'video',
-                    sources: [{ src: url, type: 'video/mp4', size: height }]
-                };
-                player.play();
-            }
         });
-    </script>
+
+        // Плеер
+        const videoContainer = document.getElementById('video-player-container');
+        const videoPlayer = document.getElementById('video-player');
+        const videoSource = videoPlayer.querySelector('source');
+        let player = null;
+
+        function initPlayer() {
+            if (!player && videoPlayer) {
+                player = new Plyr(videoPlayer, {
+                    controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+                    autoplay: true
+                });
+            }
+        }
+
+        function loadVideo(videoId) {
+            const videoUrl = `/proxy/${videoId}`;
+            if (player) {
+                player.source = { type: 'video', sources: [{ src: videoUrl, type: 'video/mp4' }] };
+                player.play();
+            } else {
+                videoSource.src = videoUrl;
+                videoPlayer.load();
+                initPlayer();
+                videoPlayer.play().catch(e => console.log('Autoplay blocked', e));
+            }
+            videoContainer.style.display = 'block';
+        }
+
+        document.querySelectorAll('.video-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const videoId = link.getAttribute('data-video-id');
+                if (videoId) loadVideo(videoId);
+            });
+        });
+    })();
+</script>
 </body>
 </html>

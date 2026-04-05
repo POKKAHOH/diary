@@ -3,304 +3,135 @@
 <head>
     <title>Админка - Управление уроками</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #0f0f0f;
-            color: white;
-            margin: 0;
-            padding: 20px;
-        }
-        h1, h2 {
-            color: #ffcc00;
-        }
-        .admin-link {
-            text-align: right;
-            margin-bottom: 20px;
-        }
-        .admin-link a {
-            color: #ffcc00;
-            text-decoration: none;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: inline-block;
-            width: 120px;
-            color: #ccc;
-        }
-        input, select, textarea {
-            width: 300px;
-            padding: 5px;
-            background: #3d3d3d;
-            color: white;
-            border: 1px solid #555;
-            border-radius: 4px;
-        }
-        button, .button {
-            padding: 8px 15px;
-            background: #ffcc00;
-            color: black;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            text-decoration: none;
-            display: inline-block;
-        }
-        button:hover, .button:hover {
-            background: #e6b800;
-        }
-        table {
-            border-collapse: collapse;
-            margin-top: 20px;
-            width: 100%;
-            background: #1e1e1e;
-        }
-        th, td {
-            border: 1px solid #444;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #333;
-            color: #ffcc00;
-        }
-        tr:hover {
-            background: #2a2a2a;
-        }
-        .checkbox-col {
-            width: 30px;
-            text-align: center;
-        }
-        .checkbox-col input {
-            width: auto;
-        }
-        .bulk-actions {
-            margin: 15px 0;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .selected-counter {
-            margin-left: auto;
-            color: #ffcc00;
-        }
-        /* Модальное окно */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: #2d2d2d;
-            padding: 20px;
-            border-radius: 8px;
-            width: 400px;
-            color: white;
-        }
-        .modal-content h3 {
-            margin-top: 0;
-        }
-        .modal-buttons {
-            text-align: right;
-            margin-top: 15px;
-        }
-        .modal-buttons button {
-            margin-left: 10px;
-        }
-        .cancel {
-            background: #666;
-            color: white;
-        }
-        .hr {
-            border-top: 1px solid #444;
-            margin: 20px 0;
-        }
-        .flash-messages {
-            max-width: 800px;
-            margin: 10px auto;
-            background: #333;
-            border-left: 4px solid #ffcc00;
-            padding: 10px;
-            border-radius: 4px;
-        }
+        body { font-family: Arial, sans-serif; background: #0f0f0f; color: white; margin: 0; padding: 20px; }
+        h1, h2 { color: #ffcc00; }
+        .admin-link { text-align: right; margin-bottom: 20px; }
+        .admin-link a { color: #ffcc00; text-decoration: none; }
+        .form-group { margin-bottom: 15px; }
+        label { display: inline-block; width: 120px; color: #ccc; }
+        input, select, textarea { width: 300px; padding: 5px; background: #3d3d3d; color: white; border: 1px solid #555; border-radius: 4px; }
+        button, .button { padding: 8px 15px; background: #ffcc00; color: black; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block; }
+        button:hover, .button:hover { background: #e6b800; }
+        table { border-collapse: collapse; margin-top: 20px; width: 100%; background: #1e1e1e; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: left; }
+        th { background-color: #333; color: #ffcc00; }
+        tr:hover { background: #2a2a2a; }
+        .checkbox-col { width: 30px; text-align: center; }
+        .checkbox-col input { width: auto; }
+        .bulk-actions { margin: 15px 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .selected-counter { margin-left: auto; color: #ffcc00; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: #2d2d2d; padding: 20px; border-radius: 8px; width: 400px; color: white; }
+        .modal-content h3 { margin-top: 0; }
+        .modal-buttons { text-align: right; margin-top: 15px; }
+        .modal-buttons button { margin-left: 10px; }
+        .cancel { background: #666; color: white; }
+        .hr { border-top: 1px solid #444; margin: 20px 0; }
+        .flash-messages { max-width: 800px; margin: 10px auto; background: #333; border-left: 4px solid #ffcc00; padding: 10px; border-radius: 4px; }
     </style>
 </head>
 <body>
-    <div class="admin-link">
-        <a href="{{ url_for('logout') }}">Выйти</a>
+<div class="admin-link"><a href="{{ url_for('logout') }}">Выйти</a></div>
+<h1>📚 Управление уроками</h1>
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        <div class="flash-messages">
+            {% for msg in messages %}<p>{{ msg }}</p>{% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<h2>➕ Добавить новый урок</h2>
+<form method="post" action="{{ url_for('admin') }}">
+    <div class="form-group"><label>День:</label><select name="day_id" required>{% for day in days %}<option value="{{ day.id }}">{{ day.name }}</option>{% endfor %}</select></div>
+    <div class="form-group"><label>Неделя:</label><input type="number" name="week" min="1" value="1" required></div>
+    <div class="form-group"><label>Номер урока:</label><input type="number" name="lesson_number" min="1" max="8" required></div>
+    <div class="form-group"><label>Предмет:</label><select name="subject" required>
+	    <option value="Алгебра и начала математического анализа">Алгебра и начала математического анализа</option>
+	    <option value="Английский язык">Английский язык</option>
+	    <option value="Биология">Биология</option>
+	    <option value="Вероятность и статистика">Вероятность и статистика</option>
+	    <option value="География">География</option>
+	    <option value="Геометрия">Геометрия</option>
+	    <option value="Информатика">Информатика</option>
+	    <option value="История">История</option>
+	    <option value="Литература">Литература</option>
+	    <option value="Обществознание">Обществознание</option>
+	    <option value="Основы безопасности и защита Родины">Основы безопасности и защита Родины</option>
+	    <option value="Проектная деятельность">Проектная деятельность</option>
+	    <option value="Русский язык">Русский язык</option>
+	    <option value="Физика">Физика</option>
+	    <option value="Физическая культура">Физическая культура</option>
+	    <option value="Химия">Химия</option>
+    </select>
+    <div class="form-group"><label>Тема урока:</label><input type="text" name="topic" required></div>
+    <div class="form-group"><label>Домашнее задание:</label><textarea name="homework" rows="3"></textarea></div>
+    <button type="submit">Добавить урок</button>
+</form>
+
+<div class="hr"></div>
+
+<h2>🔄 Копирование расписания</h2>
+<form method="post" action="{{ url_for('copy_week') }}" onsubmit="return confirm('Вы уверены? Все уроки на других неделях будут заменены.')">
+    <label for="source_week">Неделя-источник:</label>
+    <select name="source_week" id="source_week" style="padding:5px; margin:0 10px;">
+        {% for w in range(1, 53) %}<option value="{{ w }}">Неделя {{ w }}</option>{% endfor %}
+    </select>
+    <button type="submit">Скопировать на все недели (1–52)</button>
+</form>
+
+<div class="hr"></div>
+
+<h2>📥 Импорт расписания из JSON</h2>
+<p>Имя файла должно содержать номер недели, например <code>week30.json</code>. Неделя определится автоматически.</p>
+<form method="post" action="{{ url_for('import_json') }}" enctype="multipart/form-data">
+    <div><label>Файл JSON:</label><input type="file" name="json_file" accept=".json" required></div>
+    <div style="margin-top:10px;"><button type="submit">Импортировать</button></div>
+</form>
+
+<div class="hr"></div>
+
+<h2>📋 Список уроков</h2>
+<div class="bulk-actions">
+    <button type="button" id="select-all-btn">✅ Выбрать все</button>
+    <button type="button" id="deselect-all-btn">❌ Снять выделение</button>
+    <button type="button" id="bulk-delete-btn" style="background:#ff6b6b; color:white;">🗑️ Удалить выбранные</button>
+    <button type="button" id="bulk-edit-btn">✏️ Редактировать выбранные</button>
+    <span class="selected-counter" id="selected-counter">Выбрано: 0</span>
+</div>
+<form id="bulk-delete-form" method="post" action="{{ url_for('bulk_delete') }}"></form>
+<form id="bulk-edit-form" method="post" action="{{ url_for('bulk_edit') }}"></form>
+
+<table id="lessons-table">
+    <thead><tr><th class="checkbox-col">✱</th><th>Неделя</th><th>День</th><th>№</th><th>Предмет</th><th>Тема</th><th>Д/з</th><th>Видео</th><th>Действия</th></tr></thead>
+    <tbody>
+        {% for lesson in lessons %}
+        <tr data-lesson-id="{{ lesson.id }}">
+            <td class="checkbox-col"><input type="checkbox" name="lesson_ids[]" value="{{ lesson.id }}" class="lesson-checkbox"></td>
+            <td>{{ lesson.week }}</td><td>{{ lesson.day.name }}</td><td>{{ lesson.lesson_number }}</td>
+            <td>{{ lesson.subject }}</td><td>{{ lesson.topic }}</td><td>{{ lesson.homework }}</td><td>{{ lesson.videos|length }}</td>
+            <td><a href="{{ url_for('edit_lesson', id=lesson.id) }}" style="color:#4da6ff;">✏️</a> <a href="{{ url_for('delete_lesson', id=lesson.id) }}" style="color:#ff6b6b; margin-left:10px;" onclick="return confirm('Удалить урок?')">🗑️</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Модальное окно массового редактирования -->
+<div id="edit-modal" class="modal">
+    <div class="modal-content">
+        <h3>Массовое редактирование</h3>
+        <p id="edit-selected-info"></p>
+        <form id="modal-edit-form" method="post" action="{{ url_for('bulk_edit') }}">
+            <div id="hidden-checkboxes-container"></div>
+            <div class="form-group"><label>Предмет:</label><select name="subject"><option value="">— не изменять —</option><option value="Алгебра">Алгебра</option><option value="Физика">Физика</option><option value="Химия">Химия</option><option value="Информатика">Информатика</option></select></div>
+            <div class="form-group"><label>Тема:</label><input type="text" name="topic" placeholder="оставьте пустым для пропуска"></div>
+            <div class="form-group"><label>Д/з:</label><textarea name="homework" rows="3" placeholder="оставьте пустым для пропуска"></textarea></div>
+            <div class="modal-buttons"><button type="button" class="cancel" id="modal-cancel">Отмена</button><button type="submit" class="submit">Применить</button></div>
+        </form>
     </div>
-
-    <h1>📚 Управление уроками</h1>
-
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            <div class="flash-messages">
-                {% for msg in messages %}
-                    <p style="margin: 5px 0;">{{ msg }}</p>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-
-    <h2>➕ Добавить новый урок</h2>
-    <form method="post" action="{{ url_for('admin') }}">
-        <div class="form-group">
-            <label>День:</label>
-            <select name="day_id" required>
-                {% for day in days %}
-                <option value="{{ day.id }}">{{ day.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Неделя:</label>
-            <input type="number" name="week" min="1" value="1" required>
-        </div>
-        <div class="form-group">
-            <label>Номер урока:</label>
-            <input type="number" name="lesson_number" min="1" max="8" required>
-        </div>
-        <div class="form-group">
-            <label>Предмет:</label>
-            <select name="subject" required>
-                <option value="Алгебра">Алгебра</option>
-                <option value="Физика">Физика</option>
-                <option value="Химия">Химия</option>
-                <option value="Информатика">Информатика</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Тема урока:</label>
-            <input type="text" name="topic" required>
-        </div>
-        <div class="form-group">
-            <label>Домашнее задание:</label>
-            <textarea name="homework" rows="3"></textarea>
-        </div>
-        <button type="submit">Добавить урок</button>
-    </form>
-
-    <div class="hr"></div>
-
-    <h2>🔄 Копирование расписания</h2>
-    <form method="post" action="{{ url_for('copy_week') }}" onsubmit="return confirm('Вы уверены? Все уроки на других неделях будут заменены на копии выбранной недели.')">
-        <label for="source_week">Неделя-источник:</label>
-        <select name="source_week" id="source_week" style="padding:5px; margin:0 10px;">
-            {% for w in range(1, 53) %}
-                <option value="{{ w }}">Неделя {{ w }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit">Скопировать на все недели (1–52)</button>
-    </form>
-
-<div style="margin-top: 20px;">
-    <a href="{{ url_for('import_json') }}" class="button">📥 Импорт из JSON</a>
 </div>
 
-    <div class="hr"></div>
-
-    <h2>📋 Список уроков</h2>
-
-    <!-- Массовые действия -->
-    <div class="bulk-actions">
-        <button type="button" id="select-all-btn">✅ Выбрать все</button>
-        <button type="button" id="deselect-all-btn">❌ Снять выделение</button>
-        <button type="button" id="bulk-delete-btn" style="background:#ff6b6b; color:white;">🗑️ Удалить выбранные</button>
-        <button type="button" id="bulk-edit-btn">✏️ Редактировать выбранные</button>
-        <span class="selected-counter" id="selected-counter">Выбрано: 0</span>
-    </div>
-
-    <!-- Форма для массового удаления (скрытая, отправляется через JS) -->
-    <form id="bulk-delete-form" method="post" action="{{ url_for('bulk_delete') }}">
-        <!-- Чекбоксы будут отправлены автоматически -->
-    </form>
-
-    <!-- Форма для массового редактирования (скрытая) -->
-    <form id="bulk-edit-form" method="post" action="{{ url_for('bulk_edit') }}">
-        <!-- Сюда будут копироваться чекбоксы перед отправкой -->
-    </form>
-
-    <!-- Таблица уроков -->
-    <table id="lessons-table">
-        <thead>
-            <tr>
-                <th class="checkbox-col">✱</th>
-                <th>Неделя</th>
-                <th>День</th>
-                <th>№</th>
-                <th>Предмет</th>
-                <th>Тема</th>
-                <th>Д/з</th>
-                <th>Видео</th>
-                <th>Действия</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for lesson in lessons %}
-            <tr data-lesson-id="{{ lesson.id }}">
-                <td class="checkbox-col">
-                    <input type="checkbox" name="lesson_ids[]" value="{{ lesson.id }}" class="lesson-checkbox">
-                </td>
-                <td>{{ lesson.week }}</td>
-                <td>{{ lesson.day.name }}</td>
-                <td>{{ lesson.lesson_number }}</td>
-                <td>{{ lesson.subject }}</td>
-                <td>{{ lesson.topic }}</td>
-                <td>{{ lesson.homework }}</td>
-                <td>{{ lesson.videos|length }}</td>
-                <td>
-                    <a href="{{ url_for('edit_lesson', id=lesson.id) }}" style="color:#4da6ff;">✏️</a>
-                    <a href="{{ url_for('delete_lesson', id=lesson.id) }}" style="color:#ff6b6b; margin-left:10px;" onclick="return confirm('Удалить урок?')">🗑️</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Модальное окно для массового редактирования -->
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <h3>Массовое редактирование</h3>
-            <p id="edit-selected-info"></p>
-            <form id="modal-edit-form" method="post" action="{{ url_for('bulk_edit') }}">
-                <!-- Сюда будут скопированы все чекбоксы через JS -->
-                <div id="hidden-checkboxes-container"></div>
-                
-                <div class="form-group">
-                    <label>Предмет:</label>
-                    <select name="subject">
-                        <option value="">— не изменять —</option>
-                        <option value="Алгебра">Алгебра</option>
-                        <option value="Физика">Физика</option>
-                        <option value="Химия">Химия</option>
-                        <option value="Информатика">Информатика</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Тема урока:</label>
-                    <input type="text" name="topic" placeholder="оставьте пустым для пропуска">
-                </div>
-                <div class="form-group">
-                    <label>Домашнее задание:</label>
-                    <textarea name="homework" rows="3" placeholder="оставьте пустым для пропуска"></textarea>
-                </div>
-                <div class="modal-buttons">
-                    <button type="button" class="cancel" id="modal-cancel">Отмена</button>
-                    <button type="submit" class="submit">Применить</button>
-                </div>
-            </form>
-        </div>
-    </div>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const checkboxes = document.querySelectorAll('.lesson-checkbox');
@@ -316,104 +147,53 @@
         const hiddenContainer = document.getElementById('hidden-checkboxes-container');
         const modalEditForm = document.getElementById('modal-edit-form');
 
-        // Функция обновления счётчика
         function updateSelectedCount() {
             const count = document.querySelectorAll('.lesson-checkbox:checked').length;
             selectedCounter.textContent = `Выбрано: ${count}`;
         }
 
-        // Выделение диапазона с Shift
         let lastChecked = null;
         checkboxes.forEach(checkbox => {
             checkbox.addEventListener('click', function(e) {
-                if (!lastChecked) {
-                    lastChecked = this;
-                    updateSelectedCount();
-                    return;
-                }
-
+                if (!lastChecked) { lastChecked = this; updateSelectedCount(); return; }
                 if (e.shiftKey) {
                     const checkboxesArray = Array.from(checkboxes);
                     const start = checkboxesArray.indexOf(lastChecked);
                     const end = checkboxesArray.indexOf(this);
                     if (start !== -1 && end !== -1) {
-                        const range = [Math.min(start, end), Math.max(start, end)];
-                        for (let i = range[0]; i <= range[1]; i++) {
-                            checkboxesArray[i].checked = true;
-                        }
+                        const [min, max] = [Math.min(start, end), Math.max(start, end)];
+                        for (let i = min; i <= max; i++) checkboxesArray[i].checked = true;
                     }
                 }
                 lastChecked = this;
                 updateSelectedCount();
             });
-
             checkbox.addEventListener('change', updateSelectedCount);
         });
 
-        // Выбрать все
-        selectAllBtn.addEventListener('click', function() {
-            checkboxes.forEach(cb => cb.checked = true);
-            updateSelectedCount();
-        });
+        selectAllBtn.addEventListener('click', () => { checkboxes.forEach(cb => cb.checked = true); updateSelectedCount(); });
+        deselectAllBtn.addEventListener('click', () => { checkboxes.forEach(cb => cb.checked = false); lastChecked = null; updateSelectedCount(); });
 
-        // Снять выделение
-        deselectAllBtn.addEventListener('click', function() {
-            checkboxes.forEach(cb => cb.checked = false);
-            lastChecked = null;
-            updateSelectedCount();
-        });
-
-        // Массовое удаление
-        bulkDeleteBtn.addEventListener('click', function() {
+        bulkDeleteBtn.addEventListener('click', () => {
             const selected = document.querySelectorAll('.lesson-checkbox:checked');
-            if (selected.length === 0) {
-                alert('Не выбрано ни одного урока');
-                return;
-            }
+            if (selected.length === 0) { alert('Не выбрано ни одного урока'); return; }
             if (!confirm(`Удалить ${selected.length} урок(ов)?`)) return;
-
             bulkDeleteForm.innerHTML = '';
-            selected.forEach(cb => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'lesson_ids[]';
-                input.value = cb.value;
-                bulkDeleteForm.appendChild(input);
-            });
+            selected.forEach(cb => { const inp = document.createElement('input'); inp.type='hidden'; inp.name='lesson_ids[]'; inp.value=cb.value; bulkDeleteForm.appendChild(inp); });
             bulkDeleteForm.submit();
         });
 
-        // Массовое редактирование
-        bulkEditBtn.addEventListener('click', function() {
+        bulkEditBtn.addEventListener('click', () => {
             const selected = document.querySelectorAll('.lesson-checkbox:checked');
-            if (selected.length === 0) {
-                alert('Не выбрано ни одного урока');
-                return;
-            }
+            if (selected.length === 0) { alert('Не выбрано ни одного урока'); return; }
             editSelectedInfo.textContent = `Выбрано уроков: ${selected.length}`;
-
             hiddenContainer.innerHTML = '';
-            selected.forEach(cb => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'lesson_ids[]';
-                input.value = cb.value;
-                hiddenContainer.appendChild(input);
-            });
-
+            selected.forEach(cb => { const inp = document.createElement('input'); inp.type='hidden'; inp.name='lesson_ids[]'; inp.value=cb.value; hiddenContainer.appendChild(inp); });
             modal.style.display = 'flex';
         });
 
-        // Закрыть модальное окно
-        modalCancel.addEventListener('click', function() {
-            modal.style.display = 'none';
-        });
-
-        window.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-            }
-        });
+        modalCancel.addEventListener('click', () => modal.style.display = 'none');
+        window.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
     });
 </script>
 </body>
