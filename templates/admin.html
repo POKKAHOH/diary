@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Админка - Управление уроками</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <style>
         body { font-family: Arial, sans-serif; background: #0f0f0f; color: white; margin: 0; padding: 20px; }
         h1, h2 { color: #ffcc00; }
@@ -28,10 +29,84 @@
         .cancel { background: #666; color: white; }
         .hr { border-top: 1px solid #444; margin: 20px 0; }
         .flash-messages { max-width: 800px; margin: 10px auto; background: #333; border-left: 4px solid #ffcc00; padding: 10px; border-radius: 4px; }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container, .schedule-grid, .week-navigation, .admin-panel {
+                padding: 12px;
+            }
+            h1 {
+                font-size: 1.5rem;
+                text-align: center;
+            }
+            .schedule-grid {
+                grid-template-columns: 1fr !important;  /* одна колонка на телефонах */
+                gap: 15px;
+            }
+            .week-navigation {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+            }
+            .month-year {
+                font-size: 1rem;
+                order: 1;
+                width: 100%;
+                text-align: center;
+            }
+            .nav-arrow {
+                font-size: 20px;
+                padding: 5px 12px;
+            }
+            .day-card {
+                margin: 0;
+            }
+            table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            .form-group input, .form-group select, .form-group textarea {
+                font-size: 16px; /* чтобы не было зума на айфонах */
+            }
+            button, .add-lesson-btn, .bulk-actions button {
+                width: 100%;
+                margin: 5px 0;
+            }
+            .bulk-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .selected-counter {
+                text-align: center;
+                margin: 10px 0;
+            }
+            .tabs {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .tab-btn {
+                width: 100%;
+                text-align: center;
+            }
+            video, iframe {
+                width: 100%;
+                height: auto;
+            }
+            .modal-content {
+                width: 95%;
+                margin: 20px auto;
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="admin-link"><a href="{{ url_for('logout') }}">Выйти</a></div>
+<div class="admin-link">
+	<a href="{{ url_for('home') }}">На главную<br></a>
+        <a href="{{ url_for('logout') }}">Выйти</a>
+</div>
 <h1>📚 Управление уроками</h1>
 
 {% with messages = get_flashed_messages() %}
@@ -48,23 +123,10 @@
     <div class="form-group"><label>Неделя:</label><input type="number" name="week" min="1" value="1" required></div>
     <div class="form-group"><label>Номер урока:</label><input type="number" name="lesson_number" min="1" max="8" required></div>
     <div class="form-group"><label>Предмет:</label><select name="subject" required>
-	    <option value="Алгебра и начала математического анализа">Алгебра и начала математического анализа</option>
-	    <option value="Английский язык">Английский язык</option>
-	    <option value="Биология">Биология</option>
-	    <option value="Вероятность и статистика">Вероятность и статистика</option>
-	    <option value="География">География</option>
-	    <option value="Геометрия">Геометрия</option>
-	    <option value="Информатика">Информатика</option>
-	    <option value="История">История</option>
-	    <option value="Литература">Литература</option>
-	    <option value="Обществознание">Обществознание</option>
-	    <option value="Основы безопасности и защита Родины">Основы безопасности и защита Родины</option>
-	    <option value="Проектная деятельность">Проектная деятельность</option>
-	    <option value="Русский язык">Русский язык</option>
-	    <option value="Физика">Физика</option>
-	    <option value="Физическая культура">Физическая культура</option>
-	    <option value="Химия">Химия</option>
-    </select>
+    {% for subj in subjects %}
+        <option value="{{ subj.name }}">{{ subj.name }}</option>
+    {% endfor %}
+</select>
     <div class="form-group"><label>Тема урока:</label><input type="text" name="topic" required></div>
     <div class="form-group"><label>Домашнее задание:</label><textarea name="homework" rows="3"></textarea></div>
     <button type="submit">Добавить урок</button>
@@ -124,13 +186,31 @@
         <p id="edit-selected-info"></p>
         <form id="modal-edit-form" method="post" action="{{ url_for('bulk_edit') }}">
             <div id="hidden-checkboxes-container"></div>
-            <div class="form-group"><label>Предмет:</label><select name="subject"><option value="">— не изменять —</option><option value="Алгебра">Алгебра</option><option value="Физика">Физика</option><option value="Химия">Химия</option><option value="Информатика">Информатика</option></select></div>
-            <div class="form-group"><label>Тема:</label><input type="text" name="topic" placeholder="оставьте пустым для пропуска"></div>
-            <div class="form-group"><label>Д/з:</label><textarea name="homework" rows="3" placeholder="оставьте пустым для пропуска"></textarea></div>
-            <div class="modal-buttons"><button type="button" class="cancel" id="modal-cancel">Отмена</button><button type="submit" class="submit">Применить</button></div>
+            <div class="form-group">
+                <label>Предмет:</label>
+                <select name="subject">
+                    <option value="">— не изменять —</option>
+                    {% for subj in subjects %}
+                        <option value="{{ subj.name }}">{{ subj.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Тема:</label>
+                <input type="text" name="topic" placeholder="оставьте пустым для пропуска">
+            </div>
+            <div class="form-group">
+                <label>Д/з:</label>
+                <textarea name="homework" rows="3" placeholder="оставьте пустым для пропуска"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="cancel" id="modal-cancel">Отмена</button>
+                <button type="submit" class="submit">Применить</button>
+            </div>
         </form>
     </div>
 </div>
+
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

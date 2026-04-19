@@ -8,7 +8,6 @@ import os
 import json
 from urllib.parse import urlparse, parse_qs
 import re
-import sys
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -19,21 +18,36 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 db = SQLAlchemy(app)
 
+# ---------- Конфигурация из .env ----------
 API_KEY = os.getenv("API_KEY")
 app.secret_key = os.getenv("app.secret_key")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
-START_DATE = date(2025, 9, 1)
-
-# OpenRouter
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+YTDLP_PROXY_COOKIEFILE = os.getenv("YTDLP_PROXY_COOKIEFILE", "/var/www/flaskapp/cookies.txt")
+YTDLP_PLAYER_CLIENTS = [client.strip() for client in os.getenv("YTDLP_PLAYER_CLIENTS", "default").split(",") if client.strip()]
+YTDLP_PO_TOKEN = os.getenv("YTDLP_PO_TOKEN")
+YTDLP_VISITOR_DATA = os.getenv("YTDLP_VISITOR_DATA")
+UPSTREAM_TIMEOUT = (10, 60)
+HOP_BY_HOP_HEADERS = {
+    "connection",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailers",
+    "transfer-encoding",
+    "upgrade",
+}
+START_DATE = date(2025, 9, 1)  # 1 сентября 2025 – понедельник первой недели
 
+# Русская локаль для месяцев
 try:
     locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
 except:
     pass
 
-# ------------------ МОДЕЛИ ------------------
+# ---------- Модели ----------
 class Day(db.Model):
     __tablename__ = 'days'
     id = db.Column(db.Integer, primary_key=True)
@@ -53,7 +67,9 @@ class Lesson(db.Model):
     subject = db.Column(db.String(100), nullable=False)
     topic = db.Column(db.String(200), nullable=False)
     homework = db.Column(db.Text, default='')
-    generated_text = db.Column(db.Text, default='')
+    generated_text_short = db.Column(db.Text, default='')
+    generated_text_medium = db.Column(db.Text, default='')
+    generated_text_long = db.Column(db.Text, default='')
     videos = db.relationship('Video', backref='lesson', lazy=True, cascade='all, delete-orphan')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -66,7 +82,12 @@ class Video(db.Model):
     title = db.Column(db.String(200))
     order = db.Column(db.Integer, default=0)
 
-# ------------------ ФУНКЦИИ ------------------
+class Subject(db.Model):
+    __tablename__ = 'subjects'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
+# ---------- Функции для внешних API ----------
 def search_videos_by_topic(topic, max_results=5):
     if not API_KEY:
         return []
@@ -101,13 +122,89 @@ def search_videos_by_topic(topic, max_results=5):
         print(f"Error searching videos for topic '{topic}': {e}")
         return []
 
+def build_embed_fallback(video_id):
+    return f'''
+    <!DOCTYPE html>
+    <html>
+    <head><title>Р’РёРґРµРѕ</title></head>
+    <body style="background:#0f0f0f; display:flex; justify-content:center; align-items:center; height:100vh;">
+        <iframe width="800" height="450"
+                src="https://www.youtube.com/embed/{video_id}?autoplay=1&rel=0"
+                frameborder="0" allow="autoplay; encrypted-media" allowfullscreen>
+        </iframe>
+    </body>
+    </html>
+    '''
+
+def build_ytdlp_options():
+    youtube_args = {
+        'player_client': YTDLP_PLAYER_CLIENTS or ['default'],
+    }
+    if YTDLP_PO_TOKEN:
+        youtube_args['po_token'] = [YTDLP_PO_TOKEN]
+    if YTDLP_VISITOR_DATA:
+        youtube_args['visitor_data'] = [YTDLP_VISITOR_DATA]
+
+    ydl_opts = {
+        'format': 'best[protocol=https][vcodec!=none][acodec!=none][ext=mp4]/best[protocol=https][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]',
+        'quiet': True,
+        'noplaylist': True,
+        'extractor_args': {
+            'youtube': youtube_args,
+        },
+        'http_headers': {
+            'Referer': 'https://www.youtube.com/',
+            'Origin': 'https://www.youtube.com',
+        },
+    }
+    if os.path.exists(YTDLP_PROXY_COOKIEFILE):
+        ydl_opts['cookiefile'] = YTDLP_PROXY_COOKIEFILE
+    return ydl_opts
+
+def select_progressive_format(info):
+    formats = info.get('formats') or []
+    candidates = []
+    for stream in formats:
+        if not stream.get('url'):
+            continue
+        if stream.get('vcodec') in (None, 'none') or stream.get('acodec') in (None, 'none'):
+            continue
+        if stream.get('protocol') not in ('http', 'https'):
+            continue
+        candidates.append(stream)
+    if not candidates and info.get('url') and info.get('protocol') in ('http', 'https'):
+        return info
+    if not candidates:
+        return None
+    return max(candidates, key=lambda item: ((item.get('height') or 0), (item.get('tbr') or 0)))
+
+def normalize_upstream_headers(*header_sources):
+    headers = {}
+    for header_source in header_sources:
+        if not header_source:
+            continue
+        for key, value in header_source.items():
+            headers[key] = value
+    headers.setdefault('Referer', 'https://www.youtube.com/')
+    headers.setdefault('Origin', 'https://www.youtube.com')
+    return headers
+
 def get_stream(video_id):
     url = f"https://www.youtube.com/watch?v={video_id}"
     ydl_opts = {
         'format': 'best[ext=mp4]/best',
         'quiet': True,
         'noplaylist': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['web'],   # или ['android'] – пробуйте оба
+            }
+        }
     }
+    # Если есть cookies.txt, подключаем
+    cookies_path = '/var/www/flaskapp/cookies.txt'
+    if os.path.exists(cookies_path):
+        ydl_opts['cookiefile'] = cookies_path
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -120,6 +217,26 @@ def get_stream(video_id):
         print(f"Error in get_stream for {video_id}: {str(e)}")
         return None
 
+def resolve_stream(video_id):
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    try:
+        with yt_dlp.YoutubeDL(build_ytdlp_options()) as ydl:
+            info = ydl.extract_info(url, download=False)
+            selected_format = select_progressive_format(info)
+            if not selected_format:
+                return None
+            return {
+                'url': selected_format.get('url'),
+                'headers': normalize_upstream_headers(
+                    info.get('http_headers'),
+                    selected_format.get('http_headers'),
+                ),
+                'content_type': selected_format.get('ext') or info.get('ext') or 'mp4',
+            }
+    except Exception as e:
+        print(f"Error in resolve_stream for {video_id}: {str(e)}")
+        return None
+
 def week_from_date(target_date):
     monday = target_date - timedelta(days=target_date.weekday())
     delta = monday - START_DATE
@@ -127,22 +244,30 @@ def week_from_date(target_date):
         return 1
     return (delta.days // 7) + 1
 
-def generate_lesson_text(topic):
+def generate_lesson_text_with_length(topic, length):
     if not OPENROUTER_API_KEY:
         return "Текст не сгенерирован: отсутствует API-ключ OpenRouter."
+    if length == 'short':
+        prompt = f"Напиши очень краткий текст на тему '{topic}' для школьника 10 класса. Объясни основные понятия простым языком. 4-5 предложений."
+        max_tokens = 400
+    elif length == 'long':
+        prompt = f"Напиши очень подробный и объёмный текст на тему '{topic}' для школьника 10 класса. Полностью раскрой тему, объясни все важные аспекты. Не ограничивай себя в количестве предложений."
+        max_tokens = 2000
+    else:
+        prompt = f"Напиши средний по объёму текст на тему '{topic}' для школьника 10 класса. Объясни тему достаточно подробно, около 10 предложений."
+        max_tokens = 700
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-    prompt = f"Напиши краткий образовательный текст на тему '{topic}' для школьника 10 класса. Объясни основные понятия простым языком, приведи примеры, подбери картинки. Объём 14-20 предложений. "
     payload = {
         "model": "openai/gpt-3.5-turbo",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 500,
+        "max_tokens": max_tokens,
         "temperature": 0.7
     }
     try:
-        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=15)
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
         return data['choices'][0]['message']['content']
@@ -150,14 +275,32 @@ def generate_lesson_text(topic):
         print(f"Ошибка генерации текста: {e}")
         return "Не удалось сгенерировать текст. Попробуйте позже."
 
+def get_or_generate_lesson_text(lesson, length):
+    if length == 'short':
+        if lesson.generated_text_short:
+            return lesson.generated_text_short
+    elif length == 'long':
+        if lesson.generated_text_long:
+            return lesson.generated_text_long
+    else:
+        if lesson.generated_text_medium:
+            return lesson.generated_text_medium
+    new_text = generate_lesson_text_with_length(lesson.topic, length)
+    if new_text and not new_text.startswith("Не удалось"):
+        if length == 'short':
+            lesson.generated_text_short = new_text
+        elif length == 'long':
+            lesson.generated_text_long = new_text
+        else:
+            lesson.generated_text_medium = new_text
+        db.session.commit()
+    return new_text
+
 def import_schedule_data(data, week, skip_videos=False):
-    """Импорт расписания из JSON. Если skip_videos=True, видео не подбираются."""
     Lesson.query.filter_by(week=week).delete()
     db.session.commit()
-
     days_map = {day.name: day.id for day in Day.query.all()}
     created = 0
-
     for date_str, lessons in data.items():
         if not isinstance(lessons, dict):
             continue
@@ -172,44 +315,33 @@ def import_schedule_data(data, week, skip_videos=False):
         day_id = days_map.get(day_name)
         if not day_id:
             continue
-
         for lesson_num_str, lesson_info in lessons.items():
             if not isinstance(lesson_info, dict):
                 continue
             lesson_num = int(lesson_num_str)
-            discipline = lesson_info.get('discipline', '')
-            topic = lesson_info.get('subject', '')
-            homework = lesson_info.get('homework', '')
+            discipline = lesson_info.get('discipline')
             if not discipline:
                 continue
-
+            topic = lesson_info.get('subject', '')
+            homework = lesson_info.get('homework', '')
+            # Добавляем предмет в справочник, если его нет
+            if not Subject.query.filter_by(name=discipline).first():
+                db.session.add(Subject(name=discipline))
             lesson = Lesson(
-                day_id=day_id,
-                week=week,
-                lesson_number=lesson_num,
-                subject=discipline,
-                topic=topic,
-                homework=homework
+                day_id=day_id, week=week, lesson_number=lesson_num,
+                subject=discipline, topic=topic, homework=homework
             )
             db.session.add(lesson)
             db.session.flush()
-
             if not skip_videos:
                 videos = search_videos_by_topic(topic)
                 for order, vid in enumerate(videos, start=1):
-                    video = Video(
-                        lesson_id=lesson.id,
-                        video_id=vid['id'],
-                        title=vid['title'],
-                        order=order
-                    )
-                    db.session.add(video)
+                    db.session.add(Video(lesson_id=lesson.id, video_id=vid['id'], title=vid['title'], order=order))
             created += 1
-
     db.session.commit()
     return created
 
-# ------------------ МАРШРУТЫ ------------------
+# ---------- Маршруты ----------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -218,12 +350,8 @@ def login():
             return redirect(url_for('admin'))
         else:
             flash('Неверный пароль')
-    return '''
-        <form method="post">
-            Пароль: <input type="password" name="password">
-            <input type="submit" value="Войти">
-        </form>
-    '''
+            return redirect(url_for('login'))
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
@@ -246,6 +374,9 @@ def admin():
         subject = request.form['subject']
         topic = request.form['topic']
         homework = request.form['homework']
+        # Добавляем предмет, если его нет
+        if not Subject.query.filter_by(name=subject).first():
+            db.session.add(Subject(name=subject))
         lesson = Lesson(day_id=day_id, week=week, lesson_number=lesson_number,
                         subject=subject, topic=topic, homework=homework)
         db.session.add(lesson)
@@ -257,7 +388,8 @@ def admin():
         flash('Урок добавлен с видео по теме')
         return redirect(url_for('admin'))
     lessons = Lesson.query.order_by(Lesson.week, Lesson.day_id, Lesson.lesson_number).all()
-    return render_template('admin.html', days=days, lessons=lessons)
+    subjects = Subject.query.order_by(Subject.name).all()
+    return render_template('admin.html', days=days, lessons=lessons, subjects=subjects)
 
 @app.route('/quick_add', methods=['POST'])
 def quick_add():
@@ -273,6 +405,8 @@ def quick_add():
     if existing:
         flash('Урок с таким номером на этой неделе уже существует')
         return redirect(url_for('home', week=week))
+    if not Subject.query.filter_by(name=subject).first():
+        db.session.add(Subject(name=subject))
     lesson = Lesson(day_id=day_id, week=week, lesson_number=lesson_number,
                     subject=subject, topic=topic, homework=homework)
     db.session.add(lesson)
@@ -290,30 +424,41 @@ def edit_lesson(id):
         return redirect(url_for('login'))
     lesson = Lesson.query.get_or_404(id)
     days = Day.query.order_by(Day.order).all()
+    subjects = Subject.query.order_by(Subject.name).all()
     if request.method == 'POST':
         day_id = request.form['day_id']
         lesson_number = request.form['lesson_number']
         week = request.form.get('week', 1, type=int)
-        existing = Lesson.query.filter(Lesson.day_id == day_id, Lesson.lesson_number == lesson_number,
-                                        Lesson.week == week, Lesson.id != id).first()
+        existing = Lesson.query.filter(
+            Lesson.day_id == day_id,
+            Lesson.lesson_number == lesson_number,
+            Lesson.week == week,
+            Lesson.id != id
+        ).first()
         if existing:
             flash('Урок с таким номером на этой неделе уже существует')
             return redirect(url_for('edit_lesson', id=id))
+        # Обновляем поля
+        old_topic = lesson.topic
         lesson.day_id = day_id
         lesson.week = week
         lesson.lesson_number = lesson_number
         lesson.subject = request.form['subject']
         lesson.topic = request.form['topic']
         lesson.homework = request.form['homework']
-        # Не меняем generated_text и видео при редактировании темы? По желанию.
-        Video.query.filter_by(lesson_id=lesson.id).delete()
-        videos = search_videos_by_topic(lesson.topic)
-        for order, vid in enumerate(videos, start=1):
-            db.session.add(Video(lesson_id=lesson.id, video_id=vid['id'], title=vid['title'], order=order))
+        # Если тема изменилась – сбрасываем кэш текстов и обновляем видео
+        if old_topic != lesson.topic:
+            lesson.generated_text_short = ''
+            lesson.generated_text_medium = ''
+            lesson.generated_text_long = ''
+            Video.query.filter_by(lesson_id=lesson.id).delete()
+            videos = search_videos_by_topic(lesson.topic)
+            for order, vid in enumerate(videos, start=1):
+                db.session.add(Video(lesson_id=lesson.id, video_id=vid['id'], title=vid['title'], order=order))
         db.session.commit()
         flash('Урок обновлён')
         return redirect(url_for('home', week=lesson.week))
-    return render_template('edit_lesson.html', lesson=lesson, days=days)
+    return render_template('edit_lesson.html', lesson=lesson, days=days, subjects=subjects)
 
 @app.route('/delete/<int:id>')
 def delete_lesson(id):
@@ -329,43 +474,109 @@ def delete_lesson(id):
 @app.route('/lesson/<int:id>')
 def lesson_detail(id):
     lesson = Lesson.query.get_or_404(id)
-
-    # 1. Генерация видео, если их нет
+    # Генерация видео, если их нет
     if not lesson.videos:
         videos = search_videos_by_topic(lesson.topic)
         if videos:
             for order, vid in enumerate(videos, start=1):
-                video = Video(
-                    lesson_id=lesson.id,
-                    video_id=vid['id'],
-                    title=vid['title'],
-                    order=order
-                )
-                db.session.add(video)
+                db.session.add(Video(lesson_id=lesson.id, video_id=vid['id'], title=vid['title'], order=order))
             db.session.commit()
             lesson = Lesson.query.get_or_404(id)
+    # Получение текста (с кэшированием)
+    length = request.args.get('length', 'medium')
+    if length not in ['short', 'medium', 'long']:
+        length = 'medium'
+    generated_text = get_or_generate_lesson_text(lesson, length)
+    return render_template('lesson.html', lesson=lesson, week=lesson.week,
+                           generated_text=generated_text, current_length=length)
 
-    # 2. Генерация текста, если его нет
-    if not lesson.generated_text:
-        text = generate_lesson_text(lesson.topic)
-        if text:
-            lesson.generated_text = text
-            db.session.commit()
-            lesson = Lesson.query.get_or_404(id)
-
-    return render_template('lesson.html', lesson=lesson)
-
-@app.route('/proxy/<video_id>')
+@app.route('/proxy/<video_id>', methods=['GET', 'HEAD'])
 def proxy_video(video_id):
+    stream = resolve_stream(video_id)
+    if stream:
+        upstream_headers = dict(stream.get('headers') or {})
+        range_header = request.headers.get('Range')
+        if range_header:
+            upstream_headers['Range'] = range_header
+        upstream_headers.setdefault('User-Agent', request.headers.get('User-Agent', 'Mozilla/5.0'))
+
+        try:
+            upstream = requests.request(
+                request.method,
+                stream['url'],
+                headers=upstream_headers,
+                stream=(request.method != 'HEAD'),
+                allow_redirects=True,
+                timeout=UPSTREAM_TIMEOUT,
+            )
+        except requests.RequestException as e:
+            print(f"Error proxying {video_id}: {e}")
+            return build_embed_fallback(video_id)
+
+        if upstream.status_code >= 400:
+            print(f"Upstream rejected {video_id} with status {upstream.status_code}")
+            upstream.close()
+            return build_embed_fallback(video_id)
+
+        response_headers = {}
+        for key, value in upstream.headers.items():
+            if key.lower() in HOP_BY_HOP_HEADERS:
+                continue
+            response_headers[key] = value
+        response_headers.setdefault('Accept-Ranges', 'bytes')
+        response_headers.setdefault('Content-Type', f"video/{stream.get('content_type', 'mp4')}")
+
+        if request.method == 'HEAD':
+            upstream.close()
+            return Response(status=upstream.status_code, headers=response_headers)
+
+        def generate_upstream():
+            try:
+                for chunk in upstream.iter_content(chunk_size=8192):
+                    if chunk:
+                        yield chunk
+            finally:
+                upstream.close()
+
+        return Response(
+            stream_with_context(generate_upstream()),
+            status=upstream.status_code,
+            headers=response_headers,
+            direct_passthrough=True,
+        )
+    return build_embed_fallback(video_id)
     video_url = get_stream(video_id)
     if not video_url:
-        return "Video not available", 404
+        # fallback: показываем iframe, если прокси не сработал
+        return f'''
+        <!DOCTYPE html>
+        <html>
+        <head><title>Видео</title></head>
+        <body style="background:#0f0f0f; display: flex; justify-content: center; align-items: center; height: 100vh;">
+            <iframe width="800" height="450" 
+                    src="https://www.youtube.com/embed/{video_id}" 
+                    frameborder="0" allowfullscreen>
+            </iframe>
+        </body>
+        </html>
+        '''
     def generate():
-        with requests.get(video_url, stream=True) as r:
+        headers = {}
+        range_header = request.headers.get('Range', None)
+        if range_header:
+            headers['Range'] = range_header
+        with requests.get(video_url, stream=True, headers=headers) as r:
             for chunk in r.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
-    return Response(stream_with_context(generate()), content_type='video/mp4')
+    response = Response(stream_with_context(generate()), content_type='video/mp4')
+    # Проксируем заголовки для перемотки
+    if 'Content-Range' in response.headers:
+        response.headers['Content-Range'] = response.headers['Content-Range']
+    if 'Accept-Ranges' in response.headers:
+        response.headers['Accept-Ranges'] = response.headers['Accept-Ranges']
+    response.headers['Accept-Ranges'] = 'bytes'
+    return response
 
 @app.route('/import_json', methods=['POST'])
 def import_json():
@@ -378,7 +589,6 @@ def import_json():
     if file.filename == '':
         flash('Файл не выбран')
         return redirect(url_for('admin'))
-    # Определяем неделю из имени файла week<number>.json
     week = None
     match = re.search(r'week(\d+)\.json$', file.filename, re.IGNORECASE)
     if match:

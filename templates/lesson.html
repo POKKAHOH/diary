@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ lesson.subject }} - {{ lesson.topic }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <style>
         * {
             box-sizing: border-box;
@@ -26,6 +27,30 @@
             color: #ffcc00;
             margin-top: 0;
         }
+	.length-selector {
+	    margin-bottom: 20px;
+	    display: flex;
+	    gap: 12px;
+	    flex-wrap: wrap;
+	    align-items: center;
+	    justify-content: center;
+	}
+	.length-btn {
+	    background: #2d2d2d;
+	    color: #ccc;
+	    border: none;
+	    padding: 8px 16px;
+	    border-radius: 30px;
+	    cursor: pointer;
+	    font-size: 0.9rem;
+	    transition: all 0.2s;
+	}
+	.length-btn.active-length,
+	.length-btn:hover {
+	    background: #ffcc00;
+	    color: #1a1a1a;
+	    font-weight: bold;
+	}
         .meta {
             color: #aaa;
             margin-bottom: 20px;
@@ -163,13 +188,15 @@
     </div>
 
     <div id="tab-text" class="tab-content">
-        <div class="generated-text">
-            {% if lesson.generated_text %}
-                {{ lesson.generated_text|safe }}
-            {% else %}
-                <p>Текстовый материал пока не сгенерирован. Попробуйте обновить страницу позже.</p>
-            {% endif %}
-        </div>
+      <div class="length-selector" style="margin-bottom: 15px;">
+        <span>Объём текста: </span>
+        <button class="length-btn" data-length="short">📄 Краткий</button>
+        <button class="length-btn" data-length="medium">📑 Средний</button>
+        <button class="length-btn" data-length="long">📚 Объёмный</button>
+      </div>
+      <div class="generated-text" id="generated-text-container">
+        {{ generated_text|safe }}
+      </div>
     </div>
 
     {% if lesson.homework %}
@@ -179,7 +206,7 @@
     </div>
     {% endif %}
 
-    <a href="{{ url_for('home') }}" class="back-link">← Назад к расписанию</a>
+    <a href="{{ url_for('home', week=week) }}" class="back-link">← Назад к расписанию</a>
 </div>
 
 <script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
@@ -238,6 +265,36 @@
             });
         });
     })();
+
+    // --- Обработка выбора объёма текста ---
+    const lengthBtns = document.querySelectorAll('.length-btn');
+    const textContainer = document.getElementById('generated-text-container');
+
+    if (lengthBtns && textContainer) {
+        lengthBtns.forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const selectedLength = btn.dataset.length;
+                // Убираем активный класс у всех кнопок и ставим на нажатую
+                lengthBtns.forEach(b => b.classList.remove('active-length'));
+                btn.classList.add('active-length');
+                
+                // Показываем индикатор загрузки
+                textContainer.innerHTML = '<p>Генерация текста...</p>';
+
+                // Отправляем запрос на сервер с параметром length
+                const response = await fetch(`/lesson/{{ lesson.id }}?length=${selectedLength}`);
+                const html = await response.text();
+                
+                // Извлекаем только содержимое контейнера из полученного HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newText = doc.getElementById('generated-text-container').innerHTML;
+                
+                textContainer.innerHTML = newText;
+            });
+        });
+    }
+
 </script>
 </body>
 </html>

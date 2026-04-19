@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Вход в админку</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f0f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-container {
+            background: #1a1a1a;
+            border-radius: 24px;
+            padding: 30px 25px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a2a;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .login-header h1 {
+            color: #ffcc00;
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+        .login-header p {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            color: #ccc;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        input[type="password"] {
+            width: 100%;
+            padding: 14px 16px;
+            background: #2d2d2d;
+            border: 1px solid #3d3d3d;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #ffcc00;
+            box-shadow: 0 0 0 2px rgba(255,204,0,0.2);
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #ffcc00;
+            color: #1a1a1a;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #e6b800;
+        }
+        .flash-messages {
+            margin-bottom: 20px;
+            background: #2c2c2c;
+            border-left: 4px solid #ff6b6b;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        .flash-messages p {
+            color: #ff6b6b;
+            margin: 0;
+            font-size: 0.9rem;
+        }
+        .footer-links {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .footer-links a {
+            color: #4da6ff;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        /* Мобильная адаптация */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 20px;
+            }
+            .login-header h1 {
+                font-size: 1.6rem;
+            }
+            input[type="password"], button {
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>🔐 Вход</h1>
+            <p>Введите пароль администратора</p>
+        </div>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for msg in messages %}
+                        <p>{{ msg }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <form method="post">
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" name="password" placeholder="••••••••" autofocus required>
+            </div>
+            <button type="submit">Войти</button>
+        </form>
+
+        <div class="footer-links">
+            <a href="{{ url_for('home') }}">← На главную</a>
+        </div>
+    </div>
+</body>
+</html>

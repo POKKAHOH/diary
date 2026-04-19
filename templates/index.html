@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Geniigg - Расписание</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -232,14 +233,68 @@
             background: #ffcc00;
             color: black;
         }
+        /* Мобильная версия (ширина до 768px) */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .schedule-grid {
+                grid-template-columns: repeat(2, 1fr); /* 2 колонки → 3 строки */
+                gap: 12px;
+                padding: 0;
+            }
+            .day-card {
+                padding: 12px;
+            }
+            .day-card h3 {
+                font-size: 1.2rem;
+                margin: 0 0 8px 0;
+            }
+            .lesson {
+                padding: 10px;
+                margin-bottom: 10px;
+            }
+            .lesson-num {
+                font-size: 1rem;
+            }
+            .lesson-subject, .lesson-topic {
+                font-size: 0.95rem;
+            }
+            .week-navigation {
+                max-width: 90%;
+                padding: 6px 12px;
+                margin: 10px auto;
+            }
+            .nav-arrow {
+                font-size: 28px;
+                padding: 4px 10px;
+            }
+            .month-year {
+                font-size: 18px;
+            }
+            .admin-link a, .back-link {
+                font-size: 0.9rem;
+                padding: 6px 10px;
+            }
+            button, .add-lesson-btn {
+                padding: 8px 14px;
+                font-size: 0.9rem;
+            }
+            input, select, textarea {
+                font-size: 16px; /* предотвращает зум при фокусе на iOS */
+                padding: 8px;
+            }
+        }
+
     </style>
 </head>
 <body>
     <div class="admin-link">
         {% if is_admin %}
-            <a href="{{ url_for('logout') }}">Выйти (админ)</a>
+	    <a href="{{ url_for('admin') }}">Редактирование расписания<br></a>
+            <a href="{{ url_for('logout') }}">Выйти</a>
         {% else %}
-            <a href="{{ url_for('login') }}">Вход для админа</a>
+            <a href="{{ url_for('login') }}">Вход</a>
         {% endif %}
     </div>
 
@@ -286,39 +341,41 @@
         </div>
         {% endfor %}
     </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Календарь
-            const trigger = document.getElementById('month-year-trigger');
-            const popup = document.getElementById('date-picker-popup');
-            const datePicker = document.getElementById('date-picker');
-            const goBtn = document.getElementById('go-to-date');
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const trigger = document.getElementById('month-year-trigger');
+        const popup = document.getElementById('date-picker-popup');
+        const datePicker = document.getElementById('date-picker');
+        const goBtn = document.getElementById('go-to-date');
 
-            trigger.addEventListener('click', function(e) {
-                e.stopPropagation();
-                popup.style.display = popup.style.display === 'none' ? 'flex' : 'none';
-                if (popup.style.display === 'flex') {
-                    datePicker.focus();
-                }
-            });
+        if (!trigger || !popup || !datePicker || !goBtn) return;
 
-            goBtn.addEventListener('click', function() {
-                const selectedDate = datePicker.value;
-                if (selectedDate) {
-                    window.location.href = `?date=${selectedDate}`;
-                }
-            });
+        trigger.addEventListener('click', function(e) {
+            e.stopPropagation();
+            popup.style.display = popup.style.display === 'none' ? 'flex' : 'none';
+            if (popup.style.display === 'flex') {
+                datePicker.focus();
+            }
+        });
 
-            document.addEventListener('click', function(e) {
-                if (!trigger.contains(e.target) && !popup.contains(e.target)) {
-                    popup.style.display = 'none';
-                }
-            });
+        goBtn.addEventListener('click', function() {
+            const selectedDate = datePicker.value;
+            if (selectedDate) {
+                window.location.href = `?date=${selectedDate}`;
+            }
+        });
 
-            popup.addEventListener('click', function(e) {
-                e.stopPropagation();
-            });
+        document.addEventListener('click', function(e) {
+            if (!trigger.contains(e.target) && !popup.contains(e.target)) {
+                popup.style.display = 'none';
+            }
+        });
 
-    </script>
+        popup.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    });
+</script>
+
 </body>
 </html>
