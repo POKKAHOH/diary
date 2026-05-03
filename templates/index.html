@@ -173,6 +173,71 @@
         .add-lesson-btn:hover {
             background: #444;
         }
+
+
+	.video-search {
+	    text-align: center;
+	    margin: 30px auto;
+	    max-width: 500px;
+	}
+	.video-search h3 {
+	    color: #ffcc00;
+	    margin-bottom: 10px;
+	}
+	.video-search input {
+	    padding: 12px;
+	    width: 70%;
+	    font-size: 16px;
+	    border: 1px solid #444;
+	    background: #2d2d2d;
+	    color: white;
+	    border-radius: 8px 0 0 8px;
+	    outline: none;
+	}
+	.video-search button {
+	    padding: 12px 20px;
+	    font-size: 16px;
+	    background: #ffcc00;
+	    color: #1a1a1a;
+	    border: none;
+	    border-radius: 0 8px 8px 0;
+	    cursor: pointer;
+	    font-weight: bold;
+	    background: #e6b800;
+	}
+	.video-search .search-hint {
+	    font-size: 0.8rem;
+	    color: #aaa;
+	    margin-top: 8px;
+	}
+	.video-search form {
+	    display: flex;
+	    max-width: 500px;
+	    margin: 0 auto;
+	}
+	.video-search input {
+	    flex: 1;
+	    padding: 12px;
+	    background: #2d2d2d;
+	    border: 1px solid #444;
+	    border-right: none;
+	    border-radius: 40px 0 0 40px;
+	    color: white;
+	}
+	.video-search button {
+	    padding: 12px 20px;
+	    background: #ffcc00;
+	    border: 1px solid #ffcc00;
+	    border-left: none;
+	    border-radius: 0 40px 40px 0;
+	    cursor: pointer;
+	    font-weight: bold;
+	}
+
+
+
+
+
         /* Модальные окна */
         .modal {
             display: none;
@@ -301,7 +366,7 @@
     <h1>📚 Расписание уроков</h1>
     <!-- БЛОК НАВИГАЦИИ -->
     <div class="week-navigation">
-        <a href="?week={{ current_week-1 if current_week > 1 else 1 }}" class="nav-arrow">←</a>
+        <a href="{{ url_for('home', week=current_week-1 if current_week>1 else 1, secret=1 if secret_mode else none) }}" class="nav-arrow">←</a>
         <span class="month-year" id="month-year-trigger">
             Неделя {{ current_week }}: {{ month_year }}
             <div id="date-picker-popup" class="date-picker-popup">
@@ -309,7 +374,7 @@
                 <button id="go-to-date">Перейти</button>
             </div>
         </span>
-        <a href="?week={{ current_week+1 }}" class="nav-arrow">→</a>
+        <a href="{{ url_for('home', week=current_week+1, secret=1 if secret_mode else none) }}" class="nav-arrow">→</a>
     </div>
 
 {% with messages = get_flashed_messages() %}
@@ -333,14 +398,70 @@
                     <span class="lesson-num">{{ lesson.lesson_number }}.</span>
                     <span class="lesson-subject">{{ lesson.subject }}</span>
                     <a href="{{ url_for('lesson_detail', id=lesson.id) }}" class="lesson-topic">{{ lesson.topic }}</a>
+		    {% if is_admin %}
+			<div class="admin-icons">
+			    <a href="{{ url_for('edit_lesson', id=lesson.id) }}" class="edit-btn" title="Редактировать">✏️</a>
+			    <a href="{{ url_for('delete_lesson', id=lesson.id) }}" class="delete-btn" title="Удалить" onclick="return confirm('Удалить урок?')">🗑️</a>
+			</div>
+		    {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
                 <p class="no-lesson">Нет уроков</p>
             {% endif %}
+            {% if is_admin %}
+                <button class="add-lesson-btn" data-day-id="{{ day.id }}" data-week="{{ current_week }}">➕ Добавить урок</button>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
+
+<!-- Модальное окно для добавления урока -->
+<div id="add-lesson-modal" class="modal">
+    <div class="modal-content">
+        <h3>➕ Добавить урок</h3>
+        <form id="add-lesson-form" method="POST" action="{{ url_for('quick_add') }}">
+            <input type="hidden" name="day_id" id="modal-day-id">
+            <input type="hidden" name="week" id="modal-week">
+            <div class="form-group">
+                <label>Номер урока:</label>
+                <input type="number" name="lesson_number" min="1" max="8" required>
+            </div>
+            <div class="form-group">
+                <label>Предмет:</label>
+                <select name="subject" required>
+                    {% for subj in subjects %}
+                        <option value="{{ subj.name }}">{{ subj.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Тема урока:</label>
+                <input type="text" name="topic" required>
+            </div>
+            <div class="form-group">
+                <label>Домашнее задание:</label>
+                <textarea name="homework" rows="3"></textarea>
+            </div>
+            <div class="modal-buttons">
+                <button type="button" class="cancel" id="modal-close">Отмена</button>
+                <button type="submit" class="submit">Добавить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="video-search">
+    <form method="GET" action="{{ url_for('results') }}">
+        <input type="hidden" name="week" value="{{ current_week }}">
+        {% if secret_mode %}
+            <input type="hidden" name="secret" value="1">
+        {% endif %}
+        <input type="text" name="q" placeholder="Поиск видео на YouTube" value="">
+        <button type="submit">Найти видео</button>
+    </form>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const trigger = document.getElementById('month-year-trigger');
@@ -375,7 +496,36 @@
             e.stopPropagation();
         });
     });
+
+
+    // Модальное окно добавления урока
+    const addModal = document.getElementById('add-lesson-modal');
+    const addDayId = document.getElementById('modal-day-id');
+    const addWeek = document.getElementById('modal-week');
+    const modalClose = document.getElementById('modal-close');
+
+    document.querySelectorAll('.add-lesson-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            addDayId.value = this.dataset.dayId;
+            addWeek.value = this.dataset.week;
+            addModal.style.display = 'flex';
+        });
+    });
+
+    if (modalClose) {
+        modalClose.addEventListener('click', function() {
+            addModal.style.display = 'none';
+        });
+    }
+
+    window.addEventListener('click', function(e) {
+        if (e.target === addModal) {
+            addModal.style.display = 'none';
+        }
+    });
+
 </script>
+
 
 </body>
 </html>

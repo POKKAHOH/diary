@@ -5,4 +5,5 @@ __pycache__/
 instance/
 templates/lesson.html.orig
 school.db
+*.txt
 

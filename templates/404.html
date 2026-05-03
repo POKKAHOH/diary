@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Страница не найдена - Geniigg</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        .error-container {
+            max-width: 500px;
+            padding: 20px;
+        }
+        h1 {
+            font-size: 6rem;
+            color: #ffcc00;
+            margin: 0;
+        }
+        h2 {
+            font-size: 2rem;
+            margin: 10px 0;
+        }
+        p {
+            color: #aaa;
+            margin: 20px 0;
+        }
+        a {
+            display: inline-block;
+            background: #ffcc00;
+            color: #1a1a1a;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        a:hover {
+            background: #e6b800;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>404</h1>
+        <h2>Страница не найдена</h2>
+        <p>Извините, запрошенный адрес не существует или был перемещён.</p><br>
+        <img src="{{ url_for('static', filename='img/404.jpg') }}" alt="404" width="404" height="404"><br>
+        <a href="{{ url_for('home') }}">Вернуться на главную</a>
+    </div>
+</body>
+</html>

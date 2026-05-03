@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, Response, stream_with_context, session, redirect, url_for, flash, abort
+from flask import Flask, render_template, request, Response, stream_with_context, session, redirect, url_for, flash, abort, jsonify
 from datetime import date, timedelta, datetime
 import locale
 import requests
@@ -18,7 +18,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 db = SQLAlchemy(app)
 
-# ---------- Конфигурация из .env ----------
+# ---------- Конфигурация из .env -----------
 API_KEY = os.getenv("API_KEY")
 app.secret_key = os.getenv("app.secret_key")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
@@ -161,7 +161,25 @@ def build_ytdlp_options():
         ydl_opts['cookiefile'] = YTDLP_PROXY_COOKIEFILE
     return ydl_opts
 
-def select_progressive_format(info):
+def parse_quality_target(value):
+    if not value:
+        return None
+    normalized = value.strip().lower()
+    if normalized in ('best', 'auto', 'default'):
+        return None
+    match = re.search(r'(\d{3,4})', normalized)
+    if not match:
+        return None
+    return int(match.group(1))
+
+def stream_sort_key(stream):
+    return (
+        stream.get('height') or 0,
+        stream.get('fps') or 0,
+        stream.get('tbr') or 0,
+    )
+
+def collect_progressive_formats(info):
     formats = info.get('formats') or []
     candidates = []
     for stream in formats:
@@ -173,10 +191,64 @@ def select_progressive_format(info):
             continue
         candidates.append(stream)
     if not candidates and info.get('url') and info.get('protocol') in ('http', 'https'):
-        return info
+        candidates.append(info)
+    return candidates
+
+def format_quality_label(stream):
+    height = stream.get('height')
+    fps = stream.get('fps') or 0
+    if not height:
+        return 'best'
+    label = f"{int(height)}p"
+    if fps and fps > 31:
+        label += f"{int(round(fps))}"
+    return label
+
+def select_progressive_format(info, quality=None):
+    candidates = collect_progressive_formats(info)
     if not candidates:
         return None
-    return max(candidates, key=lambda item: ((item.get('height') or 0), (item.get('tbr') or 0)))
+
+    target_height = parse_quality_target(quality)
+    if target_height is None:
+        return max(candidates, key=stream_sort_key)
+
+    matching = [stream for stream in candidates if (stream.get('height') or 0) <= target_height]
+    if matching:
+        return max(matching, key=stream_sort_key)
+
+    return min(
+        candidates,
+        key=lambda stream: (
+            abs((stream.get('height') or 10_000) - target_height),
+            -(stream.get('tbr') or 0),
+        ),
+    )
+
+def build_quality_catalog(info, video_id):
+    by_label = {}
+    for stream in collect_progressive_formats(info):
+        label = format_quality_label(stream)
+        item = {
+            'quality': label,
+            'height': stream.get('height'),
+            'width': stream.get('width'),
+            'fps': stream.get('fps'),
+            'ext': stream.get('ext') or info.get('ext') or 'mp4',
+            'format_id': stream.get('format_id'),
+            'bitrate': stream.get('tbr'),
+            '_sort': stream_sort_key(stream),
+        }
+        current = by_label.get(label)
+        if current is None or item['_sort'] > current['_sort']:
+            by_label[label] = item
+
+    qualities = []
+    for item in sorted(by_label.values(), key=lambda value: value['_sort']):
+        item.pop('_sort', None)
+        item['proxy_url'] = url_for('proxy_video', video_id=video_id, quality=item['quality'])
+        qualities.append(item)
+    return qualities
 
 def normalize_upstream_headers(*header_sources):
     headers = {}
@@ -188,6 +260,11 @@ def normalize_upstream_headers(*header_sources):
     headers.setdefault('Referer', 'https://www.youtube.com/')
     headers.setdefault('Origin', 'https://www.youtube.com')
     return headers
+
+def extract_video_info(video_id):
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    with yt_dlp.YoutubeDL(build_ytdlp_options()) as ydl:
+        return ydl.extract_info(url, download=False)
 
 def get_stream(video_id):
     url = f"https://www.youtube.com/watch?v={video_id}"
@@ -217,22 +294,23 @@ def get_stream(video_id):
         print(f"Error in get_stream for {video_id}: {str(e)}")
         return None
 
-def resolve_stream(video_id):
-    url = f"https://www.youtube.com/watch?v={video_id}"
+def resolve_stream(video_id, quality=None):
     try:
-        with yt_dlp.YoutubeDL(build_ytdlp_options()) as ydl:
-            info = ydl.extract_info(url, download=False)
-            selected_format = select_progressive_format(info)
-            if not selected_format:
-                return None
-            return {
-                'url': selected_format.get('url'),
-                'headers': normalize_upstream_headers(
-                    info.get('http_headers'),
-                    selected_format.get('http_headers'),
-                ),
-                'content_type': selected_format.get('ext') or info.get('ext') or 'mp4',
-            }
+        info = extract_video_info(video_id)
+        selected_format = select_progressive_format(info, quality=quality)
+        if not selected_format:
+            return None
+        return {
+            'url': selected_format.get('url'),
+            'headers': normalize_upstream_headers(
+                info.get('http_headers'),
+                selected_format.get('http_headers'),
+            ),
+            'content_type': selected_format.get('ext') or info.get('ext') or 'mp4',
+            'quality': format_quality_label(selected_format),
+            'height': selected_format.get('height'),
+            'width': selected_format.get('width'),
+        }
     except Exception as e:
         print(f"Error in resolve_stream for {video_id}: {str(e)}")
         return None
@@ -340,6 +418,70 @@ def import_schedule_data(data, week, skip_videos=False):
             created += 1
     db.session.commit()
     return created
+
+def search_youtube_educational(query, max_results=6):
+    """Образовательный поиск: добавляет 'урок объяснение', категория 27, фильтр Shorts."""
+    full_query = f"{query} урок объяснение"
+    return _search_youtube_common(full_query, max_results, educational=True)
+
+def search_youtube_raw(query, max_results=6):
+    """Сырой поиск: без образовательных фильтров, но исключает Shorts."""
+    return _search_youtube_common(query, max_results, educational=False)
+
+def _search_youtube_common(query, max_results, educational=False):
+    """Универсальная функция поиска видео с фильтрацией Shorts."""
+    search_url = "https://www.googleapis.com/youtube/v3/search"
+    params = {
+        "part": "snippet",
+        "q": query,
+        "type": "video",
+        "maxResults": max_results * 2,   # запрашиваем больше, чтобы потом отфильтровать
+        "key": API_KEY,
+        "relevanceLanguage": "ru",
+        "regionCode": "RU",
+    }
+    if educational:
+        params["videoDuration"] = "medium"   # исключаем слишком короткие
+        params["videoCategoryId"] = "27"     # категория "Образование"
+        params["safeSearch"] = "strict"      # безопасный поиск
+
+    try:
+        r = requests.get(search_url, params=params, timeout=10)
+        data = r.json()
+        video_ids = [item["id"]["videoId"] for item in data.get("items", [])]
+        if not video_ids:
+            return []
+
+        # Получаем длительности и дополнительную информацию
+        videos_url = "https://www.googleapis.com/youtube/v3/videos"
+        params2 = {
+            "part": "contentDetails,snippet",
+            "id": ",".join(video_ids),
+            "key": API_KEY
+        }
+        r2 = requests.get(videos_url, params=params2, timeout=10)
+        data2 = r2.json()
+
+        videos = []
+        for item in data2.get("items", []):
+            duration = item["contentDetails"]["duration"]
+            # Исключаем Shorts (нет минут и часов – значит длительность < 60 секунд)
+            if "M" not in duration and "H" not in duration:
+                continue
+            title = item["snippet"]["title"]
+            if len(title) < 3:
+                continue
+            videos.append({
+                "title": title,
+                "video_id": item["id"],
+                "thumbnail": item["snippet"]["thumbnails"]["medium"]["url"]
+            })
+            if len(videos) >= max_results:
+                break
+        return videos
+    except Exception as e:
+        print(f"Ошибка поиска видео: {e}")
+        return []
 
 # ---------- Маршруты ----------
 @app.route('/login', methods=['GET', 'POST'])
@@ -490,9 +632,26 @@ def lesson_detail(id):
     return render_template('lesson.html', lesson=lesson, week=lesson.week,
                            generated_text=generated_text, current_length=length)
 
+@app.route('/proxy/<video_id>/qualities')
+def proxy_video_qualities(video_id):
+    try:
+        info = extract_video_info(video_id)
+    except Exception as e:
+        print(f"Error loading qualities for {video_id}: {e}")
+        return jsonify({'error': 'failed_to_load_qualities', 'video_id': video_id}), 502
+
+    qualities = build_quality_catalog(info, video_id)
+    return jsonify({
+        'video_id': video_id,
+        'default_quality': 'best',
+        'qualities': qualities,
+        'note': 'This list contains only progressive formats that can be proxied as a single stream.',
+    })
+
 @app.route('/proxy/<video_id>', methods=['GET', 'HEAD'])
 def proxy_video(video_id):
-    stream = resolve_stream(video_id)
+    quality = request.args.get('quality')
+    stream = resolve_stream(video_id, quality=quality)
     if stream:
         upstream_headers = dict(stream.get('headers') or {})
         range_header = request.headers.get('Range')
@@ -525,6 +684,7 @@ def proxy_video(video_id):
             response_headers[key] = value
         response_headers.setdefault('Accept-Ranges', 'bytes')
         response_headers.setdefault('Content-Type', f"video/{stream.get('content_type', 'mp4')}")
+        response_headers['X-Proxy-Selected-Quality'] = stream.get('quality', 'best')
 
         if request.method == 'HEAD':
             upstream.close()
@@ -684,7 +844,27 @@ def bulk_edit():
     flash(f'Обновлено {len(lesson_ids)} уроков')
     return redirect(url_for('admin'))
 
-@app.route("/")
+@app.route('/results')
+def results():
+    query = request.args.get('q')
+    secret_mode = request.args.get('secret') == '1'
+    week = request.args.get('week', type=int)
+    play_id = request.args.get('play')
+    if week is None:
+        week = week_from_date(date.today())
+    videos = []
+    if query:
+        if secret_mode:
+            videos = search_youtube_raw(query)
+        else:
+            videos = search_youtube_educational(query)
+    return render_template('results.html',
+                           videos=videos,
+                           query=query,
+                           current_week=week,
+                           play_id=play_id)
+
+@app.route('/')
 def home():
     date_str = request.args.get('date')
     if date_str:
@@ -707,20 +887,31 @@ def home():
     month_year = f"{month_name_ru} {first_day_date.year}"
     days = Day.query.order_by(Day.order).all()
     schedule = []
+    subjects = Subject.query.order_by(Subject.name).all()
     for i, day in enumerate(days):
         day_date = START_DATE + timedelta(weeks=week-1, days=i)
         lessons = Lesson.query.filter_by(day_id=day.id, week=week).order_by(Lesson.lesson_number).all()
         schedule.append({'id': day.id, 'name': day.name, 'date': day_date, 'lessons': lessons})
     today_str = date.today().isoformat()
+    secret_mode = request.args.get('secret') == '1'
     is_admin = session.get('admin', False)
     return render_template("index.html",
                            schedule=schedule,
                            current_week=week,
-                           month_year=month_year,
                            current_month=first_day_date.month,
                            current_year=first_day_date.year,
                            today_str=today_str,
-                           is_admin=is_admin)
+                           is_admin=is_admin,
+			   subjects=subjects,
+                           secret_mode=secret_mode)
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return render_template('500.html'), 500
 
 if __name__ == "__main__":
     app.run()
