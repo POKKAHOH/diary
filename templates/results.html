@@ -131,6 +131,61 @@
             font-size: 0.8rem;
             color: #555;
         }
+        .video-wrapper {
+            position: relative;
+            margin-top: 20px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .quality-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s;
+            display: none;
+        }
+        .video-wrapper:hover .quality-btn {
+            display: block;
+        }
+        .quality-menu {
+            position: absolute;
+            top: 45px;
+            right: 12px;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            padding: 5px 0;
+            min-width: 100px;
+            z-index: 20;
+            display: none;
+            flex-direction: column;
+        }
+        .quality-menu a {
+            color: #eee;
+            padding: 8px 15px;
+            text-decoration: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .quality-menu a:hover {
+            background: #ffcc00;
+            color: #1a1a1a;
+        }
     </style>
 </head>
 <body>
@@ -141,19 +196,15 @@
         <form method="GET" action="{{ url_for('results') }}">
             <input type="text" name="q" placeholder="Введите тему урока" value="{{ query or '' }}" required>
             <button type="submit">Найти</button>
-            <!-- Скрытое поле для сохранения секрета – никаких подписей -->
-            {% if request.args.get('secret') == '1' %}
-                <input type="hidden" name="secret" value="1">
-            {% endif %}
             <input type="hidden" name="week" value="{{ current_week }}">
         </form>
-        <!-- Кнопка переключения режима УДАЛЕНА -->
     </div>
+
     {% if videos %}
         <div class="video-grid">
             {% for v in videos %}
             <div class="video-card">
-                <a href="{{ url_for('results', q=query, week=current_week, secret=1 if secret_mode else none, play=v.video_id) }}">
+                <a href="#" class="video-link" data-video-id="{{ v.video_id }}">
                     <img src="{{ v.thumbnail }}" alt="{{ v.title }}">
                     <div class="title">{{ v.title }}</div>
                 </a>
@@ -161,27 +212,98 @@
             {% endfor %}
         </div>
     {% elif query %}
-        <div class="no-results">
-            😞 По запросу "{{ query }}" ничего не найдено. Попробуйте другую тему или переключите режим поиска.
-        </div>
+        <div class="no-results">😞 По запросу "{{ query }}" ничего не найдено.</div>
     {% else %}
-        <div class="no-results">
-            🔎 Введите тему для поиска видеоуроков.
-        </div>
+        <div class="no-results">🔎 Введите тему для поиска видеоуроков.</div>
     {% endif %}
 
-    {% if play_id %}
-    <div class="video-player">
-        <video controls autoplay>
-            <source src="/proxy/{{ play_id }}" type="video/mp4">
-        </video>
+    <!-- Контейнер для плеера -->
+    <div id="video-container" class="video-wrapper" style="display: none;">
+        <video id="search-video" controls></video>
+        <button id="quality-btn" class="quality-btn">⚙️ Качество</button>
+        <div id="quality-menu" class="quality-menu"></div>
     </div>
-    {% endif %}
 
     <div style="text-align: center;">
         <a href="{{ url_for('home', week=current_week) }}" class="back-link">← Вернуться к расписанию</a>
     </div>
-    <footer>Geniigg — учебная платформа</footer>
 </div>
+
+<script>
+    (function() {
+        const videoContainer = document.getElementById('video-container');
+        const videoElement = document.getElementById('search-video');
+        const qualityBtn = document.getElementById('quality-btn');
+        const qualityMenu = document.getElementById('quality-menu');
+        let currentVideoId = null;
+        let currentQualities = [];
+
+        async function loadQualities(videoId) {
+            try {
+                const response = await fetch(`/api/qualities/${videoId}`);
+                if (!response.ok) return [];
+                const data = await response.json();
+                return data.qualities || [];
+            } catch (error) {
+                console.error('Ошибка загрузки качеств:', error);
+                return [];
+            }
+        }
+
+        function buildQualityMenu(qualities) {
+            qualityMenu.innerHTML = '';
+            if (!qualities.length) return;
+            qualities.forEach(q => {
+                const option = document.createElement('a');
+                option.textContent = q.quality;
+                option.onclick = (e) => {
+                    e.preventDefault();
+                    const newSrc = `/proxy/${currentVideoId}?quality=${q.quality}`;
+                    videoElement.src = newSrc;
+                    videoElement.load();
+                    videoElement.play().catch(e => console.log('play error', e));
+                    qualityMenu.style.display = 'none';
+                };
+                qualityMenu.appendChild(option);
+            });
+        }
+
+        async function playVideo(videoId) {
+            currentVideoId = videoId;
+            const qualities = await loadQualities(videoId);
+            currentQualities = qualities;
+            buildQualityMenu(qualities);
+            let videoUrl = `/proxy/${videoId}`;
+            if (qualities.length) {
+                videoUrl += `?quality=${qualities[0].quality}`;
+            }
+            videoElement.src = videoUrl;
+            videoContainer.style.display = 'block';
+            videoElement.load();
+            videoElement.play().catch(e => console.log('autoplay failed', e));
+        }
+
+        document.querySelectorAll('.video-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const videoId = link.dataset.videoId;
+                playVideo(videoId);
+            });
+        });
+
+        if (qualityBtn && qualityMenu) {
+            qualityBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = qualityMenu.style.display === 'flex';
+                qualityMenu.style.display = isVisible ? 'none' : 'flex';
+            });
+            document.addEventListener('click', (e) => {
+                if (!qualityBtn.contains(e.target) && !qualityMenu.contains(e.target)) {
+                    qualityMenu.style.display = 'none';
+                }
+            });
+        }
+    })();
+</script>
 </body>
 </html>

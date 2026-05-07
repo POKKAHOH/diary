@@ -146,7 +146,7 @@ def build_ytdlp_options():
         youtube_args['visitor_data'] = [YTDLP_VISITOR_DATA]
 
     ydl_opts = {
-        'format': 'best[protocol=https][vcodec!=none][acodec!=none][ext=mp4]/best[protocol=https][vcodec!=none][acodec!=none]/best[vcodec!=none][acodec!=none]',
+        'format': 'bestvideo+bestaudio/best',
         'quiet': True,
         'noplaylist': True,
         'extractor_args': {
@@ -185,8 +185,8 @@ def collect_progressive_formats(info):
     for stream in formats:
         if not stream.get('url'):
             continue
-        if stream.get('vcodec') in (None, 'none') or stream.get('acodec') in (None, 'none'):
-            continue
+        if stream.get('vcodec') in (None, 'none'):
+            continue               # пропускаем форматы без видео
         if stream.get('protocol') not in ('http', 'https'):
             continue
         candidates.append(stream)
@@ -483,6 +483,41 @@ def _search_youtube_common(query, max_results, educational=False):
         print(f"Ошибка поиска видео: {e}")
         return []
 
+def _build_quality_catalog(info, video_id):
+    """Возвращает список словарей с доступными качествами видео."""
+    from flask import url_for
+    qualities = []
+    # Собираем прогрессивные форматы (mp4 с видео и аудио)
+    candidates = collect_progressive_formats(info)
+    # Группируем по уникальной метке качества (например, "720p")
+    unique_qualities = {}
+    for stream in candidates:
+        label = format_quality_label(stream)
+        if label not in unique_qualities:
+            # Сохраняем лучший вариант для этого качества (по высоте и битрейту)
+            unique_qualities[label] = stream
+        else:
+            existing = unique_qualities[label]
+            if (stream.get('height') or 0) > (existing.get('height') or 0):
+                unique_qualities[label] = stream
+            elif (stream.get('tbr') or 0) > (existing.get('tbr') or 0):
+                unique_qualities[label] = stream
+    # Сортируем по убыванию качества (числовое значение в метке)
+    sorted_labels = sorted(unique_qualities.keys(), key=lambda x: int(x.rstrip('p')) if x != 'best' else 0, reverse=True)
+    for label in sorted_labels:
+        stream = unique_qualities[label]
+        quality_info = {
+            "quality": label,
+            "height": stream.get('height'),
+            "width": stream.get('width'),
+            "fps": stream.get('fps'),
+            "ext": stream.get('ext') or "mp4",
+            "proxy_url": url_for('proxy_video', video_id=video_id, quality=label)
+        }
+        qualities.append(quality_info)
+    return qualities
+
+
 # ---------- Маршруты ----------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -648,6 +683,22 @@ def proxy_video_qualities(video_id):
         'note': 'This list contains only progressive formats that can be proxied as a single stream.',
     })
 
+@app.route('/api/qualities/<video_id>')
+def api_qualities(video_id):
+    """Возвращает JSON список доступных качеств."""
+    try:
+        info = extract_video_info(video_id)
+    except Exception as e:
+        return jsonify({'error': 'failed_to_load_qualities', 'video_id': video_id}), 502
+
+    qualities = _build_quality_catalog(info, video_id)
+    return jsonify({
+        'video_id': video_id,
+        'default_quality': 'best',
+        'qualities': qualities,
+    })
+
+
 @app.route('/proxy/<video_id>', methods=['GET', 'HEAD'])
 def proxy_video(video_id):
     quality = request.args.get('quality')
@@ -705,38 +756,6 @@ def proxy_video(video_id):
             direct_passthrough=True,
         )
     return build_embed_fallback(video_id)
-    video_url = get_stream(video_id)
-    if not video_url:
-        # fallback: показываем iframe, если прокси не сработал
-        return f'''
-        <!DOCTYPE html>
-        <html>
-        <head><title>Видео</title></head>
-        <body style="background:#0f0f0f; display: flex; justify-content: center; align-items: center; height: 100vh;">
-            <iframe width="800" height="450" 
-                    src="https://www.youtube.com/embed/{video_id}" 
-                    frameborder="0" allowfullscreen>
-            </iframe>
-        </body>
-        </html>
-        '''
-    def generate():
-        headers = {}
-        range_header = request.headers.get('Range', None)
-        if range_header:
-            headers['Range'] = range_header
-        with requests.get(video_url, stream=True, headers=headers) as r:
-            for chunk in r.iter_content(chunk_size=8192):
-                if chunk:
-                    yield chunk
-    response = Response(stream_with_context(generate()), content_type='video/mp4')
-    # Проксируем заголовки для перемотки
-    if 'Content-Range' in response.headers:
-        response.headers['Content-Range'] = response.headers['Content-Range']
-    if 'Accept-Ranges' in response.headers:
-        response.headers['Accept-Ranges'] = response.headers['Accept-Ranges']
-    response.headers['Accept-Ranges'] = 'bytes'
-    return response
 
 @app.route('/import_json', methods=['POST'])
 def import_json():

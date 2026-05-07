@@ -2,12 +2,10 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ lesson.subject }} - {{ lesson.topic }}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #0f0f0f;
@@ -21,106 +19,87 @@
             background: #1a1a1a;
             border-radius: 16px;
             padding: 25px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         }
-        h1 {
-            color: #ffcc00;
-            margin-top: 0;
-        }
-	.length-selector {
-	    margin-bottom: 20px;
-	    display: flex;
-	    gap: 12px;
-	    flex-wrap: wrap;
-	    align-items: center;
-	    justify-content: center;
-	}
-	.length-btn {
-	    background: #2d2d2d;
-	    color: #ccc;
-	    border: none;
-	    padding: 8px 16px;
-	    border-radius: 30px;
-	    cursor: pointer;
-	    font-size: 0.9rem;
-	    transition: all 0.2s;
-	}
-	.length-btn.active-length,
-	.length-btn:hover {
-	    background: #ffcc00;
-	    color: #1a1a1a;
-	    font-weight: bold;
-	}
-        .meta {
-            color: #aaa;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 10px;
-        }
-        .tabs {
-            display: flex;
-            gap: 8px;
-            border-bottom: 1px solid #333;
-            margin-bottom: 20px;
-        }
+        h1 { color: #ffcc00; margin-top: 0; }
+        .meta { color: #aaa; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .tabs { display: flex; gap: 8px; border-bottom: 1px solid #333; margin-bottom: 20px; }
         .tab-btn {
-            background: none;
-            border: none;
-            padding: 10px 20px;
-            font-size: 1rem;
-            cursor: pointer;
-            color: #ccc;
-            border-radius: 8px 8px 0 0;
+            background: none; border: none; padding: 10px 20px; font-size: 1rem;
+            cursor: pointer; color: #ccc; border-radius: 8px 8px 0 0;
             transition: all 0.2s;
         }
-        .tab-btn.active {
-            background: #ffcc00;
-            color: #1a1a1a;
-            font-weight: bold;
-        }
-        .tab-btn:hover:not(.active) {
-            background: #2a2a2a;
-            color: #ffcc00;
-        }
-        .tab-content {
-            display: none;
-            animation: fade 0.3s ease;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        @keyframes fade {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        .video-list {
-            margin-top: 10px;
-        }
+        .tab-btn.active { background: #ffcc00; color: #1a1a1a; font-weight: bold; }
+        .tab-btn:hover:not(.active) { background: #2a2a2a; color: #ffcc00; }
+        .tab-content { display: none; animation: fade 0.3s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+        .video-list { margin-top: 10px; }
         .video-item {
-            background: #252525;
-            margin: 12px 0;
-            padding: 12px 15px;
-            border-radius: 12px;
-            transition: background 0.2s;
+            background: #252525; margin: 12px 0; padding: 12px 15px;
+            border-radius: 12px; transition: background 0.2s;
         }
-        .video-item:hover {
-            background: #2f2f2f;
-        }
+        .video-item:hover { background: #2f2f2f; }
         .video-link {
-            color: #4da6ff;
-            text-decoration: none;
-            font-weight: 500;
-            display: block;
-            cursor: pointer;
+            color: #4da6ff; text-decoration: none; font-weight: 500;
+            display: block; cursor: pointer;
         }
-        .video-link:hover {
-            text-decoration: underline;
-        }
-        #video-player-container {
-            margin-top: 25px;
+        .video-link:hover { text-decoration: underline; }
+        .video-wrapper {
+            position: relative;
+            margin-top: 20px;
             background: #000;
             border-radius: 12px;
             overflow: hidden;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        /* Кнопка качества, появляется при наведении */
+        .quality-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 14px;
+            cursor: pointer;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+            transition: opacity 0.2s;
+            display: none;
+        }
+        .video-wrapper:hover .quality-btn {
+            display: block;
+        }
+        .quality-menu {
+            position: absolute;
+            top: 45px;
+            right: 12px;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            padding: 5px 0;
+            min-width: 100px;
+            z-index: 20;
+            display: none;
+            flex-direction: column;
+        }
+        .quality-menu a {
+            color: #eee;
+            padding: 8px 15px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.1s;
+            cursor: pointer;
+        }
+        .quality-menu a:hover {
+            background: #ffcc00;
+            color: #1a1a1a;
         }
         .generated-text {
             background: #1e1e1e;
@@ -144,17 +123,12 @@
             background: #252525;
             padding: 8px 16px;
             border-radius: 8px;
-            transition: background 0.2s;
-        }
-        .back-link:hover {
-            background: #333;
         }
         @media (max-width: 600px) {
             .container { padding: 15px; }
-            .tab-btn { padding: 8px 12px; }
+            .tab-btn { padding: 8px 12px; font-size: 0.9rem; }
         }
     </style>
-    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
 </head>
 <body>
 <div class="container">
@@ -177,10 +151,10 @@
                 </div>
                 {% endfor %}
             </div>
-            <div id="video-player-container" style="display: none;">
-                <video id="video-player" controls>
-                    <source src="" type="video/mp4">
-                </video>
+            <div id="video-container" class="video-wrapper" style="display: none;">
+                <video id="lesson-video" controls></video>
+                <button id="quality-btn" class="quality-btn">⚙️ Качество</button>
+                <div id="quality-menu" class="quality-menu"></div>
             </div>
         {% else %}
             <p>К этому уроку пока нет видеоуроков.</p>
@@ -188,15 +162,13 @@
     </div>
 
     <div id="tab-text" class="tab-content">
-      <div class="length-selector" style="margin-bottom: 15px;">
-        <span>Объём текста: </span>
-        <button class="length-btn" data-length="short">📄 Краткий</button>
-        <button class="length-btn" data-length="medium">📑 Средний</button>
-        <button class="length-btn" data-length="long">📚 Объёмный</button>
-      </div>
-      <div class="generated-text" id="generated-text-container">
-        {{ generated_text|safe }}
-      </div>
+        <div class="generated-text">
+            {% if lesson.generated_text %}
+                {{ lesson.generated_text|safe }}
+            {% else %}
+                <p>Текстовый материал пока не сгенерирован.</p>
+            {% endif %}
+        </div>
     </div>
 
     {% if lesson.homework %}
@@ -209,10 +181,9 @@
     <a href="{{ url_for('home', week=week) }}" class="back-link">← Назад к расписанию</a>
 </div>
 
-<script src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
 <script>
     (function() {
-        // Вкладки
+        // Переключение вкладок
         const tabBtns = document.querySelectorAll('.tab-btn');
         const tabContents = {
             videos: document.getElementById('tab-videos'),
@@ -228,73 +199,86 @@
             });
         });
 
-        // Плеер
-        const videoContainer = document.getElementById('video-player-container');
-        const videoPlayer = document.getElementById('video-player');
-        const videoSource = videoPlayer.querySelector('source');
-        let player = null;
+        // --- Плеер с качеством ---
+        const videoContainer = document.getElementById('video-container');
+        const videoElement = document.getElementById('lesson-video');
+        const qualityBtn = document.getElementById('quality-btn');
+        const qualityMenu = document.getElementById('quality-menu');
+        let currentVideoId = null;
+        let currentQualities = [];   // массив { quality, proxy_url }
 
-        function initPlayer() {
-            if (!player && videoPlayer) {
-                player = new Plyr(videoPlayer, {
-                    controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
-                    autoplay: true
-                });
+        // Загрузка списка качеств с сервера
+        async function loadQualities(videoId) {
+            try {
+                const response = await fetch(`/api/qualities/${videoId}`);
+                if (!response.ok) return [];
+                const data = await response.json();
+                return data.qualities || [];
+            } catch (error) {
+                console.error('Ошибка загрузки качеств:', error);
+                return [];
             }
         }
 
-        function loadVideo(videoId) {
-            const videoUrl = `/proxy/${videoId}`;
-            if (player) {
-                player.source = { type: 'video', sources: [{ src: videoUrl, type: 'video/mp4' }] };
-                player.play();
-            } else {
-                videoSource.src = videoUrl;
-                videoPlayer.load();
-                initPlayer();
-                videoPlayer.play().catch(e => console.log('Autoplay blocked', e));
+        // Заполнить меню качества
+        function buildQualityMenu(qualities) {
+            qualityMenu.innerHTML = '';
+            if (!qualities.length) return;
+            qualities.forEach(q => {
+                const option = document.createElement('a');
+                option.textContent = q.quality;
+                option.onclick = (e) => {
+                    e.preventDefault();
+                    const newSrc = `/proxy/${currentVideoId}?quality=${q.quality}`;
+                    videoElement.src = newSrc;
+                    videoElement.load();
+                    videoElement.play().catch(e => console.log('play error', e));
+                    qualityMenu.style.display = 'none';
+                };
+                qualityMenu.appendChild(option);
+            });
+        }
+
+        // Инициализация видео с определённым качеством (по умолчанию первое)
+        async function initVideo(videoId) {
+            currentVideoId = videoId;
+            const qualities = await loadQualities(videoId);
+            currentQualities = qualities;
+            buildQualityMenu(qualities);
+            let videoUrl = `/proxy/${videoId}`;
+            if (qualities.length) {
+                videoUrl += `?quality=${qualities[0].quality}`;
             }
+            videoElement.src = videoUrl;
             videoContainer.style.display = 'block';
+            videoElement.load();
+            videoElement.play().catch(e => console.log('autoplay failed', e));
         }
 
+        // Обработка кликов по ссылкам видео
         document.querySelectorAll('.video-link').forEach(link => {
-            link.addEventListener('click', (e) => {
+            link.addEventListener('click', async (e) => {
                 e.preventDefault();
-                const videoId = link.getAttribute('data-video-id');
-                if (videoId) loadVideo(videoId);
+                const videoId = link.dataset.videoId;
+                await initVideo(videoId);
             });
         });
+
+        // Показать/скрыть меню качества
+        if (qualityBtn && qualityMenu) {
+            qualityBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = qualityMenu.style.display === 'flex';
+                qualityMenu.style.display = isVisible ? 'none' : 'flex';
+            });
+            // Закрыть меню при клике вне
+            document.addEventListener('click', (e) => {
+                if (!qualityBtn.contains(e.target) && !qualityMenu.contains(e.target)) {
+                    qualityMenu.style.display = 'none';
+                }
+            });
+        }
     })();
-
-    // --- Обработка выбора объёма текста ---
-    const lengthBtns = document.querySelectorAll('.length-btn');
-    const textContainer = document.getElementById('generated-text-container');
-
-    if (lengthBtns && textContainer) {
-        lengthBtns.forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const selectedLength = btn.dataset.length;
-                // Убираем активный класс у всех кнопок и ставим на нажатую
-                lengthBtns.forEach(b => b.classList.remove('active-length'));
-                btn.classList.add('active-length');
-                
-                // Показываем индикатор загрузки
-                textContainer.innerHTML = '<p>Генерация текста...</p>';
-
-                // Отправляем запрос на сервер с параметром length
-                const response = await fetch(`/lesson/{{ lesson.id }}?length=${selectedLength}`);
-                const html = await response.text();
-                
-                // Извлекаем только содержимое контейнера из полученного HTML
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const newText = doc.getElementById('generated-text-container').innerHTML;
-                
-                textContainer.innerHTML = newText;
-            });
-        });
-    }
-
 </script>
 </body>
 </html>
